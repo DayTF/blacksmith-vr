@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "description": "Provisional fantasy reference defaults for M0 tuning. Not metallurgical measurements.",
+  "curves": {
+    "youngs_modulus": {
+      "axis": "temperature",
+      "unit": "Pa",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          200000000000
+        ],
+        [
+          800,
+          120000000000
+        ],
+        [
+          1400,
+          20000000000
+        ],
+        [
+          2200,
+          1000000000
+        ]
+      ]
+    },
+    "yield_strength": {
+      "axis": "temperature",
+      "unit": "Pa",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          350000000
+        ],
+        [
+          800,
+          150000000
+        ],
+        [
+          1400,
+          40000000
+        ],
+        [
+          2200,
+          1000000
+        ]
+      ]
+    },
+    "hardness": {
+      "op": "multiply",
+      "inputs": [
+        {
+          "axis": "temperature",
+          "unit": "HV",
+          "interpolation": "linear",
+          "keys": [
+            [
+              20,
+              300
+            ],
+            [
+              800,
+              180
+            ],
+            [
+              1400,
+              70
+            ],
+            [
+              2200,
+              10
+            ]
+          ]
+        },
+        {
+          "axis": "plastic_strain",
+          "unit": "ratio",
+          "interpolation": "linear",
+          "keys": [
+            [
+              0,
+              1
+            ],
+            [
+              0.2,
+              1.2
+            ],
+            [
+              1,
+              1.8
+            ]
+          ]
+        }
+      ]
+    },
+    "thermal_conductivity": {
+      "axis": "temperature",
+      "unit": "W/(m K)",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          60
+        ],
+        [
+          1000,
+          40
+        ],
+        [
+          2200,
+          25
+        ]
+      ]
+    },
+    "specific_heat": {
+      "axis": "temperature",
+      "unit": "J/(kg K)",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          450
+        ],
+        [
+          1000,
+          650
+        ],
+        [
+          2200,
+          800
+        ]
+      ]
+    },
+    "density": {
+      "axis": "temperature",
+      "unit": "kg/m^3",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          7800
+        ],
+        [
+          1000,
+          7500
+        ],
+        [
+          2200,
+          7100
+        ]
+      ]
+    },
+    "melt_fraction": {
+      "axis": "temperature",
+      "unit": "fraction",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          1400,
+          0
+        ],
+        [
+          1500,
+          1
+        ],
+        [
+          2200,
+          1
+        ]
+      ]
+    },
+    "emissivity": {
+      "axis": "temperature",
+      "unit": "ratio",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0.4
+        ],
+        [
+          1000,
+          0.8
+        ],
+        [
+          2200,
+          0.9
+        ]
+      ]
+    },
+    "color": {
+      "axis": "temperature",
+      "unit": "linear RGB",
+      "interpolation": "cubic",
+      "keys": [
+        [
+          20,
+          [
+            0.05,
+            0.05,
+            0.07
+          ]
+        ],
+        [
+          400,
+          [
+            0.1,
+            0.02,
+            0.02
+          ]
+        ],
+        [
+          700,
+          [
+            0.8,
+            0.1,
+            0
+          ]
+        ],
+        [
+          1100,
+          [
+            1,
+            0.5,
+            0
+          ]
+        ],
+        [
+          1500,
+          [
+            1,
+            0.9,
+            0.4
+          ]
+        ],
+        [
+          2200,
+          [
+            1,
+            1,
+            0.95
+          ]
+        ]
+      ]
+    },
+    "emission_energy": {
+      "axis": "temperature",
+      "unit": "multiplier",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          400,
+          0
+        ],
+        [
+          700,
+          2
+        ],
+        [
+          1100,
+          5
+        ],
+        [
+          2200,
+          12
+        ]
+      ]
+    },
+    "quench_water": {
+      "axis": "temperature",
+      "unit": "W/(m^2 K)",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          100
+        ],
+        [
+          400,
+          500
+        ],
+        [
+          1200,
+          350
+        ],
+        [
+          2200,
+          250
+        ]
+      ]
+    },
+    "quench_oil": {
+      "axis": "temperature",
+      "unit": "W/(m^2 K)",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          30
+        ],
+        [
+          300,
+          120
+        ],
+        [
+          1200,
+          100
+        ],
+        [
+          2200,
+          80
+        ]
+      ]
+    },
+    "quench_air": {
+      "axis": "temperature",
+      "unit": "W/(m^2 K)",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          10
+        ],
+        [
+          1000,
+          25
+        ],
+        [
+          2200,
+          35
+        ]
+      ]
+    },
+    "ductility": {
+      "axis": "temperature",
+      "unit": "failure strain",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0.01
+        ],
+        [
+          600,
+          0.08
+        ],
+        [
+          1000,
+          0.5
+        ],
+        [
+          1600,
+          0.7
+        ],
+        [
+          2200,
+          0.05
+        ]
+      ]
+    },
+    "work_hardening_recovery": {
+      "axis": "temperature",
+      "unit": "1/s",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          600,
+          0
+        ],
+        [
+          900,
+          0.2
+        ],
+        [
+          1400,
+          1
+        ],
+        [
+          2200,
+          2
+        ]
+      ]
+    },
+    "weldability": {
+      "axis": "temperature",
+      "unit": "ratio",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          900,
+          0
+        ],
+        [
+          1100,
+          1
+        ],
+        [
+          1350,
+          1
+        ],
+        [
+          1500,
+          0
+        ]
+      ]
+    },
+    "oxidation_rate": {
+      "axis": "temperature",
+      "unit": "fraction/s",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          600,
+          0
+        ],
+        [
+          1000,
+          0.0001
+        ],
+        [
+          1600,
+          0.001
+        ],
+        [
+          2200,
+          0.005
+        ]
+      ]
+    },
+    "thermal_expansion": {
+      "axis": "temperature",
+      "unit": "1/K",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0.000012
+        ],
+        [
+          1000,
+          0.000016
+        ],
+        [
+          2200,
+          0.00002
+        ]
+      ]
+    }
+  }
+}

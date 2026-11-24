@@ -185,12 +185,15 @@ Run with Godot Standard 4.7+ (`godot` below means your installed binary):
 
 ```sh
 godot --headless --path . --editor --import --quit
+godot --headless --path . --script tests/check_scripts.gd
 godot --headless --path . --script tests/run_all.gd
 git diff --check
 ```
 
 Editor import can exit zero while reporting script errors; CI also checks its
-log for errors. Suites are `tests/sim/**/test_*.gd`, extend `RefCounted`, and expose
+log for errors. `tests/check_scripts.gd` compiles every source/test script, including
+unreferenced scripts; CI checks both compile and test logs for engine/script errors.
+Suites are `tests/sim/**/test_*.gd`, extend `RefCounted`, and expose
 `run() -> PackedStringArray` with failure messages, empty on success. Test physical
 invariants and boundary/failure cases rather than restating implementations.
 The initial runner reports bootstrap-only status when no suites exist; this does
@@ -211,3 +214,71 @@ the next issue and verification state. Do not suggest a reset mid-task.
 Suggest a player test when enough **in-game** interaction exists to evaluate it
 (typically M1 tracked hammering, then M3's full loop). A headless library alone
 is not a playable build. State actual hardware coverage and remaining limitations.
+
+## M0 material API and schema (issue #8)
+
+`src/sim/material_curve.gd`, `material_definition.gd` and `material_library.gd`
+are plain RefCounted classes with explicit preloads, usable without editor import.
+
+```gdscript
+const Materials = preload("res://src/sim/material_library.gd")
+var materials = Materials.new()
+if not materials.load_directory("res://data/materials"):
+    # Caller reports materials.errors; the sim itself does not print.
+    return
+var state = {"temperature": 1000.0, "plastic_strain": 0.2}
+var hardness = materials.sample("prototype_mithril", "hardness", state)
+var material = materials.get_material("prototype_mithril")
+var events = material.phase_events(1300.0, 1500.0)
+```
+
+- Directory loading discovers all JSON files except `defaults.json` (configurable
+  filename). Reload is atomic: invalid data leaves the last valid catalog intact.
+  `material_ids()` returns sorted IDs; `get_material()` returns null for unknown IDs.
+- Version 1 defaults contain `schema_version: 1` and `curves`. Materials require
+  `schema_version: 1`, nonempty `id`/`name` and `impurities: []` or an impurity list.
+  Omitted material curves inherit defaults. No material registration code exists.
+- A graph is exactly one of `{ "constant": scalar_or_vector }`,
+  `{ "axis": "temperature", "interpolation": "linear", "keys": [[x, y], ...] }`,
+  or `{ "op": "multiply", "inputs": [graph, graph, ...] }`.
+  Operations: `add`, `multiply`, `min`, `max`; scalars broadcast over vectors.
+  `axis` defaults to `temperature`, interpolation to `linear`; `unit` is metadata.
+- Keys are finite, strictly increasing and nonempty, with consistent scalar or
+  vector shape. Linear, step and nonuniform Catmull-Rom cubic are supported.
+  Out-of-range inputs clamp to endpoint values. Step selects the key at/below x.
+  Cubic can overshoot; use explicit min/max graphs where bounds are required.
+- Sampling returns a float or PackedFloat64Array. Missing/non-finite inputs,
+  unknown properties/materials, invalid definitions and non-finite outputs return
+  null. Callers must supply local temperature and every axis a graph uses; do not
+  silently substitute a material state. `new(...).errors` reports bad graphs.
+- Temperature inputs are degrees Celsius; other physical values use the `unit`
+  metadata. `plastic_strain` is dimensionless accumulated work-hardening strain.
+  `plastic_strain_increment` is the current increment used by impurity-removal
+  graphs; accumulated strain alone must never trigger continued purification.
+  Hardness composes temperature and strain; `work_hardening_recovery` supplies a
+  temperature-dependent rate for the future thermal/mechanical solver.
+- `phase_transitions` have unique `id`, distinct `temperature` thresholds and
+  `modifiers` keyed by property. A modifier optionally replaces `curve`, then
+  applies `scale`, then `offset`. Sorted thresholds accumulate at/above their
+  temperatures and deactivate on cooling; no hysteresis/irreversibility is
+  currently authored. `phase_events(old, new)` emits all entry/exit events in
+  crossing order, including exact-threshold crossings, without double emission.
+- Material `processes` and impurity `processes` have explicit `enabled` booleans,
+  optional `curves`, and data such as `requires_surface`, `separates_to` and
+  `requires_explicit_removal`. Graph paths are `processes.<process>.<property>`
+  and `impurities.<id>.<process>.<property>`. Eligibility metadata is retained in
+  `material.raw_data` (treat as read-only); sampling a graph **does not authorize
+  a process or perform purification**. The future solver must enforce eligibility,
+  surface exposure, plastic spreading, equipment limits and mass accounting.
+- Each impurity requires a unique id and finite `base_concentration` in [0,1];
+  total starting concentration cannot exceed 1. Effects are retained as data,
+  with final-stat formulas still pending clarification.
+- `defaults.json`, `prototype_mithril.json` and `prototype_embersteel.json` contain
+  **provisional fantasy tuning data**. Mithril has a high melting range, one
+  separable impurity and one bound impurity; the contrasting alloy disables melt
+  purification. These files do not establish real-world metallurgy.
+
+The material layer has correctness tests, but there is no live billet, thermal
+solver, forging harness, performance result or playable scene yet. Next: granular
+mechanics **#9**, followed by thermal transport **#10** and surface purification
+**#11**. M0 remains open until the complete prototype is validated.

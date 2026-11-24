@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "id": "prototype_embersteel",
+  "name": "Prototype Embersteel",
+  "fantasy": true,
+  "description": "Contrasting layered-billet constituent for M0; provisional fantasy data.",
+  "curves": {
+    "color": {
+      "axis": "temperature",
+      "unit": "linear RGB",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          [
+            0.09,
+            0.04,
+            0.02
+          ]
+        ],
+        [
+          700,
+          [
+            0.7,
+            0.04,
+            0.01
+          ]
+        ],
+        [
+          1500,
+          [
+            1,
+            0.6,
+            0.1
+          ]
+        ],
+        [
+          2200,
+          [
+            1,
+            1,
+            0.8
+          ]
+        ]
+      ]
+    },
+    "density": {
+      "axis": "temperature",
+      "unit": "kg/m^3",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          6500
+        ],
+        [
+          2200,
+          6000
+        ]
+      ]
+    },
+    "melt_fraction": {
+      "axis": "temperature",
+      "unit": "fraction",
+      "interpolation": "linear",
+      "keys": [
+        [
+          20,
+          0
+        ],
+        [
+          1600,
+          0
+        ],
+        [
+          1800,
+          1
+        ]
+      ]
+    }
+  },
+  "processes": {
+    "melting": {
+      "enabled": false,
+      "reason": "Prototype alloy retains its impurity inclusions; forging is required.",
+      "curves": {
+        "separation_efficiency": {
+          "constant": 0
+        }
+      }
+    }
+  },
+  "impurities": [
+    {
+      "id": "bound_ash",
+      "name": "bound ash",
+      "base_concentration": 0.004,
+      "effect": {
+        "ductility_penalty": 0.3,
+        "hardness_penalty": 0.1
+      },
+      "processes": {
+        "forging": {
+          "enabled": true,
+          "requires_surface": true,
+          "requires_plastic_spreading": true,
+          "curves": {
+            "removal_fraction": {
+              "op": "min",
+              "inputs": [
+                {
+                  "constant": 1
+                },
+                {
+                  "op": "max",
+                  "inputs": [
+                    {
+                      "constant": 0
+                    },
+                    {
+                      "op": "multiply",
+                      "inputs": [
+                        {
+                          "axis": "plastic_strain_increment",
+                          "unit": "fraction",
+                          "interpolation": "linear",
+                          "keys": [
+                            [
+                              0,
+                              0
+                            ],
+                            [
+                              0.1,
+                              0.0015
+                            ],
+                            [
+                              1,
+                              0.015
+                            ]
+                          ]
+                        },
+                        {
+                          "axis": "temperature",
+                          "unit": "ratio",
+                          "interpolation": "linear",
+                          "keys": [
+                            [
+                              20,
+                              0
+                            ],
+                            [
+                              900,
+                              0
+                            ],
+                            [
+                              1000,
+                              1
+                            ],
+                            [
+                              1200,
+                              1
+                            ],
+                            [
+                              1300,
+                              0
+                            ],
+                            [
+                              2200,
+                              0
+                            ]
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "melting": {
+          "enabled": false,
+          "separates_to": "none",
+          "curves": {
+            "separation_rate": {
+              "axis": "temperature",
+              "unit": "1/s",
+              "interpolation": "linear",
+              "keys": [
+                [
+                  20,
+                  0
+                ],
+                [
+                  2100,
+                  0
+                ],
+                [
+                  2200,
+                  0
+                ]
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
