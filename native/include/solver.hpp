@@ -136,11 +136,13 @@ class Solver {
     };
     State work;
     std::vector<ProjectionPoint> projection_points;
+    std::vector<int> components;
     std::vector<std::array<double, 4>> properties;
     std::vector<double> weights, changes, spreads, lambdas, volume_lambdas, anvil_support;
     void plasticity();
     void solve_links(float inverse_h);
     void solve_volumes(float inverse_h);
+    void update_components();
     void limit_compression(float inverse_h);
     bool compression_resolved() const;
     void damp(double h);

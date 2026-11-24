@@ -181,6 +181,7 @@ func step(dt: float) -> bool:
 	var gravity := Vector3(tuning.gravity_m_s2[0], tuning.gravity_m_s2[1], tuning.gravity_m_s2[2])
 	var friction: float = tuning.get("anvil_friction_coefficient", 0.0)
 	var density_limit: float = tuning.get("maximum_density_multiplier", 0.0)
+	var components := PackedInt32Array()
 	var support := PackedFloat64Array()
 	if friction > 0.0:
 		support.resize(nodes.size())
@@ -193,6 +194,8 @@ func step(dt: float) -> bool:
 			positions[index] += velocities[index] * h
 		_project_anvil(positions, velocities, h, support)
 		_plasticity(positions, properties, rests, damages, stiffnesses, broken, strains, increments, spreading)
+		if density_limit > 0.0:
+			components = Geometry.connected_components(nodes.size(), connections, broken)
 		# Body-force displacement is an unconstrained predictor, not metal strain.
 		# Resolve its elastic support before the next irreversible strain trial.
 		for index in nodes.size():
@@ -212,14 +215,14 @@ func step(dt: float) -> bool:
 			_solve_links(positions, velocities, rests, stiffnesses, broken, lambdas, h)
 			_solve_volumes(positions, velocities, properties, active, volume_lambdas, h)
 			if density_limit > 0.0:
-				_solve_compression_limit(positions, velocities, h, density_limit)
+				_solve_compression_limit(positions, velocities, h, density_limit, components)
 			_project_anvil(positions, velocities, h, support)
 		# Resolve remaining density/anvil coupling without changing normal spring iteration counts.
 		if density_limit > 0.0 and substep == int(tuning.substeps) - 1:
 			for correction_pass in int(tuning.iterations):
-				if _compression_resolved(positions, density_limit):
+				if _compression_resolved(positions, density_limit, components):
 					break
-				_solve_compression_limit(positions, velocities, h, density_limit)
+				_solve_compression_limit(positions, velocities, h, density_limit, components)
 				_project_anvil(positions, velocities, h, support)
 		_damp(positions, velocities, broken, h)
 		for index in nodes.size():
@@ -234,7 +237,7 @@ func step(dt: float) -> bool:
 					var reduced := tangent * maxf(0.0, 1.0 - friction * support[index] / speed)
 					velocities[index].x = reduced.x
 					velocities[index].z = reduced.z
-	if density_limit > 0.0 and not _compression_resolved(positions, density_limit):
+	if density_limit > 0.0 and not _compression_resolved(positions, density_limit, components):
 		errors.append("Compression limit did not converge; state retained.")
 		return false
 	# Candidate arrays make failed updates transactional, including fracture/strain.
@@ -369,13 +372,16 @@ func _solve_volumes(positions: Array[Vector3], velocities: Array[Vector3], prope
 
 
 func _solve_compression_limit(positions: Array[Vector3], velocities: Array[Vector3],
-		h: float, density_limit: float) -> void:
+		h: float, density_limit: float, components: PackedInt32Array) -> void:
 	# Regular-grid tetrahedra start with one sixth of the reference cell volume.
 	# For fixed local mass, the density multiplier is the inverse volume ratio.
 	for cell in cells:
 		var minimum: float = cell.rest_volume / (6.0 * density_limit)
 		var ids: PackedInt32Array = cell.nodes
 		for tetra: Array in Geometry.TETRAHEDRA:
+			var component := components[ids[0]]
+			if components[ids[tetra[1]]] != component or components[ids[tetra[2]]] != component or components[ids[7]] != component:
+				continue
 			var root: Vector3 = positions[ids[0]]
 			var a: Vector3 = positions[ids[tetra[1]]] - root
 			var b: Vector3 = positions[ids[tetra[2]]] - root
@@ -406,7 +412,8 @@ func _solve_compression_limit(positions: Array[Vector3], velocities: Array[Vecto
 				velocities[id] += correction / h
 
 
-func _compression_resolved(positions: Array[Vector3], density_limit: float) -> bool:
+func _compression_resolved(positions: Array[Vector3], density_limit: float,
+		components: PackedInt32Array) -> bool:
 	# Allow up to 1% volume residual from the fixed number of projections.
 	for cell in cells:
 		var minimum_six_volume: float = 0.99 * cell.rest_volume / density_limit
@@ -414,6 +421,9 @@ func _compression_resolved(positions: Array[Vector3], density_limit: float) -> b
 		var root := positions[ids[0]]
 		var diagonal := positions[ids[7]] - root
 		for tetra: Array in Geometry.TETRAHEDRA:
+			var component := components[ids[0]]
+			if components[ids[tetra[1]]] != component or components[ids[tetra[2]]] != component or components[ids[7]] != component:
+				continue
 			var a := positions[ids[tetra[1]]] - root
 			var b := positions[ids[tetra[2]]] - root
 			if a.dot(b.cross(diagonal)) < minimum_six_volume:

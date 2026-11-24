@@ -252,6 +252,8 @@ bool Solver::step(double dt) {
         record(1, phase_start);
         phase_start = now();
         plasticity();
+        if (parameters.maximum_density_multiplier > 0)
+            update_components();
         // Resolve body-force prediction elastically before the next plastic trial.
         for (auto &n : work.nodes) {
             n.velocity += parameters.gravity * h;
@@ -444,6 +446,27 @@ void Solver::solve_volumes(float inverse_h) {
 }
 static constexpr std::array<int, 6> compression_ring{1, 3, 2, 6, 4, 5};
 
+void Solver::update_components() {
+    components.resize(work.nodes.size());
+    for (size_t i = 0; i < components.size(); ++i)
+        components[i] = static_cast<int>(i);
+    const auto root = [&](int id) {
+        while (components[id] != id) {
+            components[id] = components[components[id]];
+            id = components[id];
+        }
+        return id;
+    };
+    for (const auto &link : work.links) {
+        if (link.broken)
+            continue;
+        const int a = root(link.a), b = root(link.b);
+        components[std::max(a, b)] = std::min(a, b);
+    }
+    for (size_t i = 0; i < components.size(); ++i)
+        components[i] = root(static_cast<int>(i));
+}
+
 void Solver::limit_compression(float inverse_h) {
     // This is compression support only, even in cells whose structural edges
     // have fractured. Each of the six regular-grid tetrahedra is constrained.
@@ -453,6 +476,10 @@ void Solver::limit_compression(float inverse_h) {
         for (size_t i = 0; i < ring.size(); ++i) {
             const std::array<int, 4> ids{cell.nodes[0], cell.nodes[ring[i]],
                                         cell.nodes[ring[(i + 1) % ring.size()]], cell.nodes[7]};
+            const int component = components[ids[0]];
+            if (components[ids[1]] != component || components[ids[2]] != component ||
+                components[ids[3]] != component)
+                continue;
             const V root = projection_points[ids[0]].position;
             const V a = projection_points[ids[1]].position - root;
             const V b = projection_points[ids[2]].position - root;
@@ -491,6 +518,11 @@ bool Solver::compression_resolved() const {
         const V root = projection_points[cell.nodes[0]].position;
         const V diagonal = projection_points[cell.nodes[7]].position - root;
         for (size_t i = 0; i < ring.size(); ++i) {
+            const int component = components[cell.nodes[0]];
+            if (components[cell.nodes[ring[i]]] != component ||
+                components[cell.nodes[ring[(i + 1) % ring.size()]]] != component ||
+                components[cell.nodes[7]] != component)
+                continue;
             const V a = projection_points[cell.nodes[ring[i]]].position - root;
             const V b = projection_points[cell.nodes[ring[(i + 1) % ring.size()]]].position - root;
             if (a.dot(b.cross(diagonal)) < minimum_six_volume)

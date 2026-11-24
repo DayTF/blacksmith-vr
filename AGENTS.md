@@ -849,3 +849,16 @@ The SteamVR fixture uses a provisional multiplier of 1.25, targeting a minimum
 strong impacts. A step that cannot satisfy the bound within that budget keeps its previous
 committed state and reports nonconvergence. This is a geometry constraint,
 not a change to the material density curve or the refining mass accounting.
+
+## Heavy-strike fracture preview (#57)
+
+The user's Steam Frame retest confirmed that #53 stopped the billet spinning.
+Eight simulated 4 m/s strikes reproduced up to four isolated points. Broken
+wire links and the original face triangulation were still drawn across the
+fracture, and the #49 density projection could couple separated points through
+their former cells. The density check and projection now only use tetrahedra
+whose points remain in one component of the surviving spring graph. The viewer
+opens severed faces and draws isolated points as small fragments. It can switch
+diagonals to preserve supported triangles. Fracture retains the original mass.
+The preview still uses the original cell topology. It does not reconstruct a
+closed fracture surface or simulate fragment-to-fragment collisions.
