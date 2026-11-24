@@ -129,13 +129,17 @@ class Solver {
     double total_mass() const;
 
   private:
+    struct ProjectionPoint {
+        V position, velocity;
+        double inverse_mass;
+    };
     State work;
+    std::vector<ProjectionPoint> projection_points;
     std::vector<std::array<double, 4>> properties;
     std::vector<double> weights, changes, spreads, lambdas, volume_lambdas;
     void plasticity();
-    void solve_links(double h);
-    void solve_volumes(double h);
-    void anvil(double h);
+    void solve_links(float inverse_h);
+    void solve_volumes(float inverse_h);
     void damp(double h);
     void orientations();
 };

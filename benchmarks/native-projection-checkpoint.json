@@ -1,0 +1,246 @@
+{
+  "after": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      11.873988,
+      11.977818,
+      11.940118,
+      12.080532,
+      12.053267
+    ],
+    "median_ms": 12.022,
+    "nodes": 5000,
+    "profiles_usec": [],
+    "profiling_enabled": false,
+    "samples_ms": [
+      11.916,
+      12.022,
+      11.978,
+      12.128,
+      12.106
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "before": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      13.78958,
+      13.699263,
+      13.878219,
+      13.573272,
+      13.478023
+    ],
+    "median_ms": 13.747,
+    "nodes": 5000,
+    "profiles_usec": [],
+    "profiling_enabled": false,
+    "samples_ms": [
+      13.844,
+      13.747,
+      13.93,
+      13.626,
+      13.526
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "compatibility_after": {
+    "active_cells": 4104,
+    "backend": "native-compatibility",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      12.197276,
+      12.681729,
+      12.220436,
+      12.184964,
+      12.125177
+    ],
+    "median_ms": 170.453,
+    "nodes": 5000,
+    "profiles_usec": [],
+    "profiling_enabled": false,
+    "samples_ms": [
+      169.363,
+      172.129,
+      169.546,
+      170.781,
+      170.453
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "platform": "WSL2 x86_64 / AMD Ryzen 9 5900X / Release GCC 9.4",
+  "profile_after": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      12.031747,
+      12.132114,
+      12.055336,
+      12.040847,
+      11.991136
+    ],
+    "median_ms": 12.087,
+    "nodes": 5000,
+    "profiles_usec": [
+      {
+        "anvil_and_damping": 743.263,
+        "material_and_prediction": 176.668,
+        "orientation": 293.208,
+        "plasticity_and_setup": 960.461,
+        "spring_constraints": 4504.735,
+        "validation_and_snapshot": 360.897,
+        "volume_constraints": 4948.306
+      },
+      {
+        "anvil_and_damping": 708.214,
+        "material_and_prediction": 168.15,
+        "orientation": 303.707,
+        "plasticity_and_setup": 1083.659,
+        "spring_constraints": 4544.299,
+        "validation_and_snapshot": 356.307,
+        "volume_constraints": 4924.388
+      },
+      {
+        "anvil_and_damping": 712.775,
+        "material_and_prediction": 176.618,
+        "orientation": 292.527,
+        "plasticity_and_setup": 1035.93,
+        "spring_constraints": 4480.282,
+        "validation_and_snapshot": 334.087,
+        "volume_constraints": 4980.267
+      },
+      {
+        "anvil_and_damping": 739.573,
+        "material_and_prediction": 172.488,
+        "orientation": 297.378,
+        "plasticity_and_setup": 977.672,
+        "spring_constraints": 4487.803,
+        "validation_and_snapshot": 339.347,
+        "volume_constraints": 4983.537
+      },
+      {
+        "anvil_and_damping": 717.612,
+        "material_and_prediction": 191.067,
+        "orientation": 292.058,
+        "plasticity_and_setup": 1011.712,
+        "spring_constraints": 4501.644,
+        "validation_and_snapshot": 278.138,
+        "volume_constraints": 4950.216
+      }
+    ],
+    "profiling_enabled": true,
+    "samples_ms": [
+      12.059,
+      12.169,
+      12.098,
+      12.087,
+      12.026
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "profile_before": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      13.495425,
+      13.546044,
+      13.422552,
+      13.526474,
+      13.573184
+    ],
+    "median_ms": 13.565,
+    "nodes": 5000,
+    "profiles_usec": [
+      {
+        "anvil_and_damping": 773.356,
+        "material_and_prediction": 153.909,
+        "orientation": 302.148,
+        "plasticity_and_setup": 954.152,
+        "spring_constraints": 4525.84,
+        "validation_and_snapshot": 256.868,
+        "volume_constraints": 6481.123
+      },
+      {
+        "anvil_and_damping": 768.502,
+        "material_and_prediction": 159.809,
+        "orientation": 342.397,
+        "plasticity_and_setup": 967.023,
+        "spring_constraints": 4549.358,
+        "validation_and_snapshot": 263.607,
+        "volume_constraints": 6452.128
+      },
+      {
+        "anvil_and_damping": 767.344,
+        "material_and_prediction": 154.739,
+        "orientation": 324.077,
+        "plasticity_and_setup": 913.982,
+        "spring_constraints": 4525.862,
+        "validation_and_snapshot": 259.357,
+        "volume_constraints": 6434.411
+      },
+      {
+        "anvil_and_damping": 781.593,
+        "material_and_prediction": 160.758,
+        "orientation": 304.427,
+        "plasticity_and_setup": 951.782,
+        "spring_constraints": 4600.801,
+        "validation_and_snapshot": 258.678,
+        "volume_constraints": 6423.605
+      },
+      {
+        "anvil_and_damping": 788.759,
+        "material_and_prediction": 157.098,
+        "orientation": 294.888,
+        "plasticity_and_setup": 945.291,
+        "spring_constraints": 4582.799,
+        "validation_and_snapshot": 274.398,
+        "volume_constraints": 6485.602
+      }
+    ],
+    "profiling_enabled": true,
+    "samples_ms": [
+      13.539,
+      13.586,
+      13.461,
+      13.565,
+      13.622
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "target_met": false
+}

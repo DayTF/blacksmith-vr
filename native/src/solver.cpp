@@ -124,19 +124,20 @@ bool Parameters::valid() const {
            std::isfinite(transfer) && transfer >= 0 && transfer <= 1 && std::isfinite(depth) &&
            depth >= 0 && std::isfinite(tolerance) && tolerance >= 0;
 }
-Volume volume(const std::vector<Node> &nodes, const Cell &cell) {
+template <typename Point>
+static Volume cell_volume(const std::vector<Point> &nodes, const Cell &cell) {
     // The six tetrahedra share diagonal d=(p7-p0). Their signed volume is
     // dot(d, area)/6, where area is the closed ring 1,3,2,6,4,5's vector area.
-    // A four-triangle fan computes that same area; ring gradients are
-    // cross(next-previous,d)/6. This removes duplicate tetrahedral cross products.
+    // In a four-triangle fan, each adjacent pair shares a ray. Combine
+    // their cross products before evaluating the area. Ring gradients
+    // are cross(next-previous,d)/6.
     static constexpr int ids[6] = {1, 3, 2, 6, 4, 5};
     std::array<V, 6> ring;
     for (int i = 0; i < 6; ++i)
         ring[i] = nodes[cell.nodes[ids[i]]].position;
     const V diagonal = nodes[cell.nodes[7]].position - nodes[cell.nodes[0]].position;
-    V area;
-    for (int i = 1; i < 5; ++i)
-        area += (ring[i] - ring[0]).cross(ring[i + 1] - ring[0]);
+    const V area = (ring[1] - ring[3]).cross(ring[2] - ring[0]) +
+                   (ring[3] - ring[5]).cross(ring[4] - ring[0]);
     Volume out;
     out.value = diagonal.dot(area) / 6.0;
     out.gradient[7] = area / 6.0;
@@ -147,6 +148,19 @@ Volume volume(const std::vector<Node> &nodes, const Cell &cell) {
     }
     out.gradient[0] = -sum;
     return out;
+}
+
+Volume volume(const std::vector<Node> &nodes, const Cell &cell) {
+    return cell_volume(nodes, cell);
+}
+
+template <typename Point>
+static void project_anvil(std::vector<Point> &nodes, double anvil, double h) {
+    for (auto &n : nodes)
+        if (n.position.y < anvil) {
+            n.velocity.y += (anvil - n.position.y) / h;
+            n.position.y = static_cast<float>(anvil);
+        }
 }
 
 bool Solver::step(double dt) {
@@ -210,6 +224,8 @@ bool Solver::step(double dt) {
         l.stiffness = 0;
     properties.resize(work.nodes.size());
     const double h = dt / parameters.substeps;
+    const float inverse_h = 1.0f / static_cast<float>(h);
+    projection_points.resize(work.nodes.size());
     record(0, phase_start);
     for (int substep = 0; substep < parameters.substeps; ++substep) {
         phase_start = now();
@@ -222,7 +238,7 @@ bool Solver::step(double dt) {
             }
             n.position += n.velocity * h;
         }
-        anvil(h);
+        project_anvil(work.nodes, parameters.anvil, h);
         record(1, phase_start);
         phase_start = now();
         plasticity();
@@ -231,7 +247,7 @@ bool Solver::step(double dt) {
             n.velocity += parameters.gravity * h;
             n.position += parameters.gravity * h * h;
         }
-        anvil(h);
+        project_anvil(work.nodes, parameters.anvil, h);
         lambdas.assign(work.links.size(), 0);
         volume_lambdas.assign(work.cells.size(), 0);
         // Compliance and inverse masses do not vary during projection iterations.
@@ -252,19 +268,29 @@ bool Solver::step(double dt) {
             c.constrained = bulk > 0;
             c.alpha = c.constrained ? c.rest / (bulk * h * h) : 0;
         }
+        // Keep projection iterations in a compact working set. Each correction
+        // still updates positions and velocities in the original solver order.
+        for (size_t i = 0; i < work.nodes.size(); ++i) {
+            const auto &n = work.nodes[i];
+            projection_points[i] = {n.position, n.velocity, n.inverse_mass};
+        }
         record(2, phase_start);
         for (int iteration = 0; iteration < parameters.iterations; ++iteration) {
             phase_start = now();
-            solve_links(h);
+            solve_links(inverse_h);
             record(3, phase_start);
             phase_start = now();
-            solve_volumes(h);
+            solve_volumes(inverse_h);
             record(4, phase_start);
             phase_start = now();
-            anvil(h);
+            project_anvil(projection_points, parameters.anvil, h);
             record(5, phase_start);
         }
         phase_start = now();
+        for (size_t i = 0; i < work.nodes.size(); ++i) {
+            work.nodes[i].position = projection_points[i].position;
+            work.nodes[i].velocity = projection_points[i].velocity;
+        }
         damp(h);
         for (auto &n : work.nodes)
             if (n.position.y <= parameters.anvil && n.velocity.y < 0)
@@ -337,13 +363,13 @@ void Solver::plasticity() {
             work.nodes[i].spreading += spreads[i] / weights[i];
         }
 }
-void Solver::solve_links(double h) {
+void Solver::solve_links(float inverse_h) {
     for (size_t i = 0; i < work.links.size(); ++i) {
         const auto &l = work.links[i];
         if (l.broken || l.stiffness == 0)
             continue;
-        auto &a = work.nodes[l.a];
-        auto &b = work.nodes[l.b];
+        auto &a = projection_points[l.a];
+        auto &b = projection_points[l.b];
         const V delta = b.position - a.position;
         const double length = delta.length();
         const V direction = length > parameters.minimum_length ? delta / length : l.direction;
@@ -352,39 +378,32 @@ void Solver::solve_links(double h) {
         const V ca = direction * wa * change, cb = direction * wb * change;
         a.position -= ca;
         b.position += cb;
-        a.velocity -= ca / h;
-        b.velocity += cb / h;
+        a.velocity -= ca * inverse_h;
+        b.velocity += cb * inverse_h;
         lambdas[i] += change;
     }
 }
-void Solver::solve_volumes(double h) {
+void Solver::solve_volumes(float inverse_h) {
     for (size_t i = 0; i < work.cells.size(); ++i) {
         const auto &c = work.cells[i];
         if (!c.active || !c.constrained)
             continue;
-        const auto v = volume(work.nodes, c);
+        const auto v = cell_volume(projection_points, c);
         const double alpha = c.alpha;
         double denominator = alpha;
         for (int j = 0; j < 8; ++j)
-            denominator += v.gradient[j].dot(v.gradient[j]) * work.nodes[c.nodes[j]].inverse_mass;
+            denominator += v.gradient[j].dot(v.gradient[j]) * projection_points[c.nodes[j]].inverse_mass;
         if (denominator == 0)
             continue;
         const double change = (-(v.value - c.rest) - alpha * volume_lambdas[i]) / denominator;
         for (int j = 0; j < 8; ++j) {
-            auto &n = work.nodes[c.nodes[j]];
+            auto &n = projection_points[c.nodes[j]];
             const V correction = v.gradient[j] * (change * n.inverse_mass);
             n.position += correction;
-            n.velocity += correction / h;
+            n.velocity += correction * inverse_h;
         }
         volume_lambdas[i] += change;
     }
-}
-void Solver::anvil(double h) {
-    for (auto &n : work.nodes)
-        if (n.position.y < parameters.anvil) {
-            n.velocity.y += (parameters.anvil - n.position.y) / h;
-            n.position.y = parameters.anvil;
-        }
 }
 void Solver::damp(double h) {
     for (const auto &l : work.links) {
