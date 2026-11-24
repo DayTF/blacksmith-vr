@@ -818,3 +818,17 @@ the existing hammer API. Tracking source changes, loss and sample gaps
 prevent stale movement from becoming a strike. The scene logs simulation
 time and engine host FPS during a run. Hand/controller alignment and
 measured headset performance are pending hardware verification.
+
+## Steam Frame feedback and anvil friction
+
+The user's Steam Frame test used Valve's native controllers. Grip alignment
+felt acceptable and a clean swing appeared to register once. Follow-up work
+is tracked in #49–#54 for extreme compression, grabbing, size and spacing,
+rounded rendering, anvil friction, and hammer resistance.
+
+`anvil_friction_coefficient` is an optional nonnegative mechanics tuning value,
+defaulting to zero for earlier fixtures and benchmark comparisons. The anvil
+accumulates its normal velocity corrections each substep. Tangential slip is
+then reduced by at most the coefficient times that support. The update cannot
+reverse slip and leaves airborne points alone. The tracked preview opts into
+a provisional coefficient of 0.45 in `data/preview/tracked_hammer.json`.

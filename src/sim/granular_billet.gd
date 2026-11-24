@@ -179,20 +179,25 @@ func step(dt: float) -> bool:
 		active.append(1)
 	var h := dt / int(tuning.substeps)
 	var gravity := Vector3(tuning.gravity_m_s2[0], tuning.gravity_m_s2[1], tuning.gravity_m_s2[2])
+	var friction: float = tuning.get("anvil_friction_coefficient", 0.0)
+	var support := PackedFloat64Array()
+	if friction > 0.0:
+		support.resize(nodes.size())
 	for substep in int(tuning.substeps):
+		support.fill(0.0)
 		var properties := _properties(strains)
 		if properties.size() != nodes.size():
 			return false
 		for index in nodes.size():
 			positions[index] += velocities[index] * h
-		_project_anvil(positions, velocities, h)
+		_project_anvil(positions, velocities, h, support)
 		_plasticity(positions, properties, rests, damages, stiffnesses, broken, strains, increments, spreading)
 		# Body-force displacement is an unconstrained predictor, not metal strain.
 		# Resolve its elastic support before the next irreversible strain trial.
 		for index in nodes.size():
 			velocities[index] += gravity * h
 			positions[index] += gravity * h * h
-		_project_anvil(positions, velocities, h)
+		_project_anvil(positions, velocities, h, support)
 		var lambdas := PackedFloat64Array()
 		lambdas.resize(connections.size())
 		var volume_lambdas := PackedFloat64Array()
@@ -205,11 +210,20 @@ func step(dt: float) -> bool:
 		for iteration in int(tuning.iterations):
 			_solve_links(positions, velocities, rests, stiffnesses, broken, lambdas, h)
 			_solve_volumes(positions, velocities, properties, active, volume_lambdas, h)
-			_project_anvil(positions, velocities, h)
+			_project_anvil(positions, velocities, h, support)
 		_damp(positions, velocities, broken, h)
 		for index in nodes.size():
 			if positions[index].y <= tuning.anvil_height_m and velocities[index].y < 0.0:
+				if friction > 0.0:
+					support[index] -= velocities[index].y
 				velocities[index].y = 0.0
+			if friction > 0.0 and support[index] > 0.0:
+				var tangent := Vector3(velocities[index].x, 0.0, velocities[index].z)
+				var speed := tangent.length()
+				if speed > 0.0:
+					var reduced := tangent * maxf(0.0, 1.0 - friction * support[index] / speed)
+					velocities[index].x = reduced.x
+					velocities[index].z = reduced.z
 	# Candidate arrays make failed updates transactional, including fracture/strain.
 	for index in nodes.size():
 		if not positions[index].is_finite() or not velocities[index].is_finite() or not is_finite(strains[index]):
@@ -358,10 +372,14 @@ func _damp(positions: Array[Vector3], velocities: Array[Vector3], broken: Packed
 		velocities[link.b] -= direction * impulse * wb
 
 
-func _project_anvil(positions: Array[Vector3], velocities: Array[Vector3], h: float) -> void:
+func _project_anvil(positions: Array[Vector3], velocities: Array[Vector3], h: float,
+		support: PackedFloat64Array) -> void:
 	for index in positions.size():
 		if positions[index].y < tuning.anvil_height_m:
-			velocities[index].y += (tuning.anvil_height_m - positions[index].y) / h
+			var correction: float = (tuning.anvil_height_m - positions[index].y) / h
+			velocities[index].y += correction
+			if not support.is_empty():
+				support[index] += correction
 			positions[index].y = tuning.anvil_height_m
 
 
@@ -389,6 +407,9 @@ func _properties(strains: PackedFloat64Array) -> Array[Dictionary]:
 
 
 func _parameters_valid() -> bool:
+	var friction: Variant = tuning.get("anvil_friction_coefficient", 0.0)
+	if not _number(friction) or friction < 0.0:
+		return false
 	for key in ["minimum_step_s", "maximum_step_s", "minimum_length_m", "spring_area_m2"]:
 		if not _number(tuning.get(key)) or tuning[key] <= 0.0:
 			return false

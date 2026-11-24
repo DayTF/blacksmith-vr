@@ -25,6 +25,7 @@ func _ready() -> void:
 		_fail()
 		set_process(false)
 		return
+	session.billet.tuning.anvil_friction_coefficient = _settings.anvil_friction_coefficient
 	_stage_floor_y = -_settings.anvil_height_m
 	_build_stage()
 	_add_hammer_handle()

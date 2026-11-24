@@ -108,6 +108,7 @@ struct Parameters {
     double transfer = 0, depth = 0, tolerance = 0;
     int substeps = 0, iterations = 0;
     V gravity;
+    double anvil_friction = 0;
     bool valid() const;
 };
 struct Volume {
@@ -136,7 +137,7 @@ class Solver {
     State work;
     std::vector<ProjectionPoint> projection_points;
     std::vector<std::array<double, 4>> properties;
-    std::vector<double> weights, changes, spreads, lambdas, volume_lambdas;
+    std::vector<double> weights, changes, spreads, lambdas, volume_lambdas, anvil_support;
     void plasticity();
     void solve_links(float inverse_h);
     void solve_volumes(float inverse_h);
