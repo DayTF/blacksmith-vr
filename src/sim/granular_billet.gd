@@ -181,10 +181,15 @@ func step(dt: float) -> bool:
 		if properties.size() != nodes.size():
 			return false
 		for index in nodes.size():
-			velocities[index] += gravity * h
 			positions[index] += velocities[index] * h
 		_project_anvil(positions, velocities, h)
 		_plasticity(positions, properties, rests, damages, stiffnesses, broken, strains, increments, spreading)
+		# Body-force displacement is an unconstrained predictor, not metal strain.
+		# Resolve its elastic support before the next irreversible strain trial.
+		for index in nodes.size():
+			velocities[index] += gravity * h
+			positions[index] += gravity * h * h
+		_project_anvil(positions, velocities, h)
 		var lambdas := PackedFloat64Array()
 		lambdas.resize(connections.size())
 		var volume_lambdas := PackedFloat64Array()

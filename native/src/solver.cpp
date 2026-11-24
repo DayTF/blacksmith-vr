@@ -220,13 +220,18 @@ bool Solver::step(double dt) {
                 error = "Invalid or unavailable native material curve response.";
                 return false;
             }
-            n.velocity += parameters.gravity * h;
             n.position += n.velocity * h;
         }
         anvil(h);
         record(1, phase_start);
         phase_start = now();
         plasticity();
+        // Resolve body-force prediction elastically before the next plastic trial.
+        for (auto &n : work.nodes) {
+            n.velocity += parameters.gravity * h;
+            n.position += parameters.gravity * h * h;
+        }
+        anvil(h);
         lambdas.assign(work.links.size(), 0);
         volume_lambdas.assign(work.cells.size(), 0);
         // Compliance and inverse masses do not vary during projection iterations.

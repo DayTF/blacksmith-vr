@@ -11,6 +11,9 @@ func _initialize() -> void:
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	tuning.gravity_m_s2 = [0, 0, 0]
 	var config: Dictionary = tuning.benchmark
+	# Preserve the historical axial-only benchmark topology, separately from the
+	# corrected braced visual fixture. Do not compare unlike connection counts.
+	tuning.grid_bracing_area_scale = config.grid_bracing_area_scale
 	var backend := "reference"
 	var profiling := false
 	for argument in OS.get_cmdline_user_args():

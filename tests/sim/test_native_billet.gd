@@ -19,7 +19,29 @@ func run() -> PackedStringArray:
 	_test_impulse_parity(library)
 	_test_curves(library)
 	_test_reload()
+	_test_resting_gravity(library)
 	return failures
+
+func _test_resting_gravity(library: RefCounted) -> void:
+	var tuning := _tuning()
+	tuning.gravity_m_s2 = [0, -9.81, 0]
+	for temperature in [20.0, 1000.0]:
+		var reference = Reference.new(library, tuning)
+		var native = Native.new(library, tuning)
+		for billet: RefCounted in [reference, native]:
+			_expect(billet.build_grid(Vector3i(3, 3, 9), 0.015, Vector3(-0.015, 0, -0.06), "prototype_mithril", temperature), "Native/reference resting braced grid")
+		var original: PackedVector3Array = native.positions_snapshot()
+		_expect(native.commit_state(), "Resting native resident ownership")
+		for frame in 72:
+			_expect(reference.step(1.0 / 90) and native.step(1.0 / 90), "Native/reference gravity-only steps")
+			var positions: PackedVector3Array = native.positions_snapshot()
+			for index in positions.size():
+				_expect(positions[index].distance_to(original[index]) < 0.0001, "Native unstruck billet stays intact and in place")
+		_compare(reference, native, "Resting gravity parity")
+		for link: Dictionary in native.connections:
+			_expect(not link.broken and link.fracture_damage == 0, "Native own weight cannot cause fracture")
+		for node: Dictionary in native.nodes:
+			_expect(node.plastic_strain == 0, "Native own weight cannot cause plastic strain")
 
 func _tuning() -> Dictionary:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))

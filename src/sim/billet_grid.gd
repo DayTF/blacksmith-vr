@@ -9,6 +9,10 @@ static func populate(billet: Variant, dimensions: Vector3i, spacing: float,
 	if dimensions.x < 2 or dimensions.y < 2 or dimensions.z < 2 or not spacing > 0.0 or not is_finite(spacing) or not origin.is_finite():
 		billet.errors.append("A grid needs at least 2 nodes per axis and finite positive spacing.")
 		return false
+	var bracing: Variant = billet.tuning.get("grid_bracing_area_scale", 0.0)
+	if not (bracing is float or bracing is int) or not is_finite(bracing) or bracing < 0.0:
+		billet.errors.append("Grid bracing area scale must be finite and nonnegative.")
+		return false
 	var density: Variant = billet.materials.sample(material_id, "density", {"temperature": temperature, "plastic_strain": 0.0})
 	if not (density is float or density is int) or not is_finite(density) or density <= 0.0:
 		billet.errors.append("Grid construction requires a positive density curve.")
@@ -65,6 +69,26 @@ static func populate(billet: Variant, dimensions: Vector3i, spacing: float,
 					billet.errors.append("Grid cells need positive finite volume.")
 					return false
 				billet.cells.append({"nodes": ids, "edges": edges, "rest_volume": volume, "active": true})
+	# Axial springs plus volume alone have almost no linear shear resistance.
+	# Face/body diagonals brace that mechanism without pinning nodes to the scene.
+	if bracing > 0.0:
+		for z in dimensions.z:
+			for y in dimensions.y:
+				for x in dimensions.x:
+					var point := Vector3i(x, y, z)
+					var a := _index(point, dimensions)
+					for dz in range(-1, 2):
+						for dy in range(-1, 2):
+							for dx in range(-1, 2):
+								if absi(dx) + absi(dy) + absi(dz) < 2:
+									continue
+								var neighbor := point + Vector3i(dx, dy, dz)
+								if neighbor.x < 0 or neighbor.y < 0 or neighbor.z < 0 or neighbor.x >= dimensions.x or neighbor.y >= dimensions.y or neighbor.z >= dimensions.z:
+									continue
+								var b := _index(neighbor, dimensions)
+								if b > a and billet.connect_nodes(a, b, billet.tuning.spring_area_m2 * bracing, billet.tuning.damping_ns_per_m) < 0:
+									billet.errors.append("Invalid diagonal brace geometry.")
+									return false
 	return true
 
 

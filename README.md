@@ -26,8 +26,8 @@ extension build described in [AGENTS.md](AGENTS.md).
 Temperatures are constant fixture inputs, not a heating/cooling simulation.
 Impurities, folding/welding, tracked hammering, naming and inventory are not wired
 into this preview. Materials and mechanics are provisional; this is useful visual
-feedback for development, not calibrated forging behavior. In particular, the
-current hot billet also settles/deforms under its own weight. The hammer block
+feedback for development, not calibrated forging behavior. Both hot and cold billets now remain intact under their own weight
+before strikes. The hammer block
 illustrates scripted impacts; it is not a tracked or simulated rigid-body tool.
 
 The fixture preserves the solver's 4 substeps × 8 iterations and 1/90 s numerical
@@ -44,7 +44,8 @@ godot --headless --path .build/preview -- --preview-smoke --preview-cold
 godot --path .build/preview -- --preview-capture=/absolute/path/preview.png
 ```
 
-These finish after six synthetic strikes and check for finite geometry and a
+Add `--preview-before-strike` to verify/capture the undamaged resting billet.
+The normal runs finish after six synthetic strikes and check for finite geometry and a
 mechanical response. Captures require a working graphical display and driver.
 The preview has been rendered on Windows / RTX 3080 Ti / Vulkan Forward+ and run
 headlessly on Linux/WSL. No XR headset or tracked input is validated yet.
