@@ -33,6 +33,8 @@
 	"compression_ratio": 0.99,
 	"dt_s": 0.011111111111111112,
 	"warmup_steps": 2,
-	"samples": 5
-  }
+	"samples": 5,
+	"grid_bracing_area_scale": 0.0
+  },
+  "grid_bracing_area_scale": 0.25
 }

@@ -16,6 +16,7 @@ var _pitch := 0.55
 var _distance := 0.32
 var _capture_path := ""
 var _smoke := false
+var _before_strike := false
 var _completed := false
 
 
@@ -24,6 +25,9 @@ func _ready() -> void:
 		if argument.begins_with("--preview-capture="):
 			_capture_path = argument.trim_prefix("--preview-capture=")
 		_smoke = _smoke or argument == "--preview-smoke"
+		_before_strike = _before_strike or argument == "--preview-before-strike"
+	if _smoke or not _capture_path.is_empty():
+		get_viewport().set_disable_input(true)
 	if not session.initialize():
 		_fail()
 		return
@@ -43,7 +47,7 @@ func _process(delta: float) -> void:
 	if not session.errors.is_empty():
 		_fail()
 		set_process(false)
-	elif session.finished and not _completed and (_smoke or not _capture_path.is_empty()):
+	elif (session.finished or (_before_strike and session.elapsed >= session.config.strike_interval_s - session.config.step_s * 2)) and not _completed and (_smoke or not _capture_path.is_empty()):
 		_completed = true
 		_finish_capture()
 
@@ -252,7 +256,11 @@ func _finish_capture() -> void:
 	# Close a popup if a desktop click arrived while the automated capture ran.
 	_presets.get_popup().hide()
 	var result: Dictionary = session.summary()
-	if result.strain <= 0.0 and result.broken == 0:
+	if _before_strike and (session.strikes != 0 or result.broken != 0 or result.strain != 0):
+		session.errors.append("Unstruck billet must have no damage or plastic strain.")
+		_fail()
+		return
+	if not _before_strike and result.strain <= 0.0 and result.broken == 0:
 		session.errors.append("Demo produced neither plastic deformation nor fracture.")
 		_fail()
 		return

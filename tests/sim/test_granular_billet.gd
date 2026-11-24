@@ -29,13 +29,35 @@ func run() -> PackedStringArray:
 	_test_invalid_updates()
 	_test_volume_gradients()
 	_test_layer_rotation_and_crack_volume()
+	_test_resting_billet()
 	return failures
 
 
 func _tuning() -> Dictionary:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	data.gravity_m_s2 = [0, 0, 0]
+	data.grid_bracing_area_scale = 0.0
 	return data
+
+
+func _test_resting_billet() -> void:
+	var library = Library.new()
+	_expect(library.load_directory("res://data/materials"), "Resting fixture loads")
+	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
+	for temperature in [20.0, 1000.0]:
+		var billet = Billet.new(library, tuning)
+		_expect(billet.build_grid(Vector3i(3, 3, 9), 0.015, Vector3(-0.015, 0, -0.06), "prototype_mithril", temperature), "Resting braced billet builds")
+		var original: Array = billet.nodes.duplicate(true)
+		var mass: float = billet.total_mass()
+		for frame in 72:
+			_expect(billet.step(1.0 / 90), "Gravity-only resting step")
+			for index in billet.nodes.size():
+				var node: Dictionary = billet.nodes[index]
+				_expect(node.position.distance_to(original[index].position) < 0.0001, "Gravity cannot collapse or translate an unstruck billet")
+				_near(node.plastic_strain, 0, 1e-8, "Own weight cannot plastically forge the fixture")
+		for link: Dictionary in billet.connections:
+			_expect(not link.broken and link.fracture_damage == 0, "Own weight cannot crack the fixture")
+		_near(billet.total_mass(), mass, 1e-9, "Bracing preserves matter mass")
 
 
 func _pair(material: Variant) -> Variant:

@@ -536,8 +536,35 @@ without native compilation. No native extension manifest is copied. This does
 not remove native requirements from root-project validation or production work.
 Re-run staging after edits. See README.md for controls and capture/smoke commands.
 Surface quads follow boundary nodes; red links show fracture, but the rendered
-surface does not split yet. The hot fixture also deforms during gravitational
-settling: report the existing model's behavior honestly rather than promising
-calibrated forging feel. Windows Forward+ rendering uses the RTX 3080 Ti; XR has
+surface does not split yet. Issue #37 corrects the early preview's gravity-driven collapse. Both temperatures
+now remain intact before impacts; this still does not establish calibrated feel. Windows Forward+ rendering uses the RTX 3080 Ti; XR has
 not been tested. The old WSL software Vulkan stack crashed during rendering, so
 headless Linux checks and actual Windows rendering are reported separately.
+
+
+### Resting-billet stability correction (#37)
+
+The old axial-only grid had a shear mechanism, and plastic return mapping sampled
+unconstrained gravity prediction before elastic support. Together they fractured
+and flattened the cold billet before a hit. Grid construction now adds unique
+face/body diagonal springs with `grid_bracing_area_scale` from mechanics tuning
+(provisional default 0.25; omitted/zero keeps the old axial topology). Brace links
+use the same material curves, damping, yielding and compression/tension damage as
+other links. No points are pinned, gravity is retained and the anvil is frictionless.
+Cells retain their twelve axial edge references for volume/fracture activation.
+
+Both solvers now predict existing velocity/contact motion, perform the plastic
+trial, then apply gravity and solve elastic/contact constraints before the next
+trial. This prevents free gravity prediction from being interpreted immediately
+as irreversible compression. New tests require sub-0.1 mm displacement, zero
+plastic strain/damage and conserved mass over 72 gravity-only steps at hot/cold
+fixture temperatures, with native/reference parity. Strong strikes still deform
+or fracture; the fixture hammer speed is provisional 0.1 m/s.
+
+The opt-in benchmark explicitly sets `benchmark.grid_bracing_area_scale=0` to
+preserve the historical 5,000-point / 14,050-link topology. The visible grid has
+additional links and is not a like-for-like performance comparison. Future timing
+reports must label topology. No performance optimization is part of this fix.
+`--preview-before-strike` checks/captures the cold scene with zero hits, plastic
+strain and broken links, and is also exercised in CI. Continue with visible thermal
+transport (#10) after this correction; optimization #33 remains deferred.
