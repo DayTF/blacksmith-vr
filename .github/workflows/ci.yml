@@ -55,7 +55,13 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . --editor --import --quit 2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          if ! command -v gdb >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --batch --return-child-result -ex run -ex 'thread apply all bt' \
+            --args godot --headless --path . --editor --import --quit \
+            2>&1 | tee "$RUNNER_TEMP/godot-import.log"
           godot --headless --path . --script tests/check_scripts.gd 2>&1 | tee -a "$RUNNER_TEMP/godot-import.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-import.log"; then
             echo 'Godot reported import or script errors.' >&2
