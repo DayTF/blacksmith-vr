@@ -786,3 +786,19 @@ the sim's fold API and the hammer calls its contact-gated welding API. The
 display counts contact attempts and draws markers at successful bond patches.
 This inspection uses 40 points and ends at the weld strike. CI checks the hot
 and cold outcomes. Windows Forward+ captures are in `docs/previews/`.
+
+## Native projection checkpoint (#33)
+
+The native solver keeps position, velocity and inverse mass in a compact
+projection working set and copies them back before damping. The constraint
+order, iteration count and updates are preserved. The volume calculation
+groups the four ring triangles into two pairs of cross products. Existing
+warped-cell and reference parity tests cover the equivalent geometry.
+
+On the unchanged 5,000-point / 14,050-link / 4,104-cell benchmark at 4 × 8,
+the paired WSL2 / Ryzen 9 5900X run measured 13.747 ms before and 12.022 ms
+after for the resident adapter, with a 11.978 ms median inside the kernel.
+The <1 ms production target remains open. The debug-compatible mutable-view
+path measured 170.453 ms. Raw timings and profiles are in
+`benchmarks/native-projection-checkpoint.json`. The user-approved development
+exception allows M1 exploration while the production performance gate is open.
