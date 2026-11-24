@@ -56,7 +56,13 @@ permission. Keep this guide current when decisions or public sim APIs change.
   affected surface elements. Visible debris can wait for visual milestones.
 - Support cracks and weak weld interfaces. The original ductility threshold vs
   final ductility-stat distinction remains a material/curve composition concern;
-  do not invent a universal hard-coded cracking temperature or formula.
+  do not invent a universal hard-coded cracking temperature or formula. The user
+  has now approved the M0 damage model in #27: trial plastic strain in **both
+  compression and tension** accumulates fracture damage as increment/ductility(T).
+  Break at damage >= 1 before committing that increment's plastic rest-length
+  change. Zero ductility breaks on any attempted plastic increment. Fracture
+  damage is separate from recoverable work-hardening strain; reheating does not
+  heal it. This supersedes the unreviewed tensile-only prototype behavior.
 - Thermal transport includes conduction, Newton cooling, radiation and
   medium-dependent quenching. Heating obeys equipment limits.
 
@@ -175,6 +181,29 @@ Repository: **https://github.com/DayTF/blacksmith-vr** (private), default `main`
 6. Update local `main`, close/clean up completed issue status labels and continue.
    Keep the workspace clean and preserve existing user changes.
 
+### Sustained autonomous work
+
+The expected default is to **continue implementing**, not to end after a plan,
+commit, passing test, issue, PR, merge, or milestone. Select the next actionable
+issue after each merge and do as much authorized work as practical. Do not ask
+whether to continue or whether to merge a passing PR. Automatic merges are
+authorized, but only after checking CI for the current head and reviewing the
+change against its issue. Diagnose failures and fix them before moving on.
+
+Stop only for a genuine external blocker or required design decision, a useful
+user-testing checkpoint, or a justified context handoff. Do available independent
+work when a dependency is blocked, unless an unresolved spec ambiguity requires
+stopping under the original instructions. Do not guess missing physical/gameplay
+rules to keep moving. Keep issues and this guide sufficient for another session
+to resume without the original conversation.
+
+Suggest user testing when there is enough **in-game content or interesting visible
+behavior** to evaluate. Supply launch instructions, concrete things to try and
+known limitations. Do not interrupt for a headless library or routine unit-test
+result. Continue independent work while awaiting optional feedback; wait when a
+hardware/feel decision is a real prerequisite. Do not claim XR testing without
+actual hardware evidence.
+
 Do not publish a Steam release or otherwise message people without the specific
 authorization/access required for that action. Creating project issues and PRs
 and merging passing PRs are already authorized.
@@ -206,10 +235,15 @@ Do not expose tokens or alter authentication unnecessarily. Do not commit
 was downloaded and checksum-verified at
 `/tmp/blacksmith-setup/godot/Godot_v4.7.2-stable_linux.x86_64`; `/tmp` is ephemeral.
 
-The user permits a checkpoint and a fresh-session suggestion when the next task
-will not benefit from conversation history. Before stopping, merge passing work,
-record public APIs/decisions here or in issue-linked repository docs, and identify
-the next issue and verification state. Do not suggest a reset mid-task.
+When context is heavy and the next task does not need the conversation history,
+use the repository's `skills/blacksmith-continue/SKILL.md` to prepare a durable
+handoff. Prefer completing the current issue and merging passing work first.
+Record the exact commit/branch, next issue, verification state, unresolved work,
+and preserved user changes. Suggest a fresh session only at a useful boundary;
+do not use it as a routine reason to stop after each PR or mid-debugging.
+The skill can start a separate task when the available host tool's explicit
+user-request requirement is met; it cannot reset this conversation or manufacture
+authorization. Otherwise leave a concise ready-to-use continuation prompt.
 
 Suggest a player test when enough **in-game** interaction exists to evaluate it
 (typically M1 tracked hammering, then M3's full loop). A headless library alone
@@ -282,3 +316,22 @@ The material layer has correctness tests, but there is no live billet, thermal
 solver, forging harness, performance result or playable scene yet. Next: granular
 mechanics **#9**, followed by thermal transport **#10** and surface purification
 **#11**. M0 remains open until the complete prototype is validated.
+
+## M0 granular mechanics prototype (issue #9, in progress)
+
+`src/sim/granular_billet.gd` exposes a manually constructed spring network. Pass a
+loaded material library and a tuning dictionary to `new()`, add material points
+with `add_node()` and links with `connect_nodes()`, and call `step(dt)` in SI units
+(temperatures in Celsius). `hammer(center, outward_normal, radius, mass, velocity)`
+transfers momentum to the foremost covered nodes within the configured face depth.
+`data/sim/mechanics.json` contains provisional tuning; callers load it and choose
+node/link geometry, mass and integration timestep. The solver uses semi-implicit
+Euler, axial springs and a flat, frictionless, inelastic anvil. It samples each
+endpoint's material curves, using the weaker endpoint for modulus, yield and
+failure strain. Link `rest_length`, `stiffness`, `damping` and `broken`, and each
+node's local state, are exposed for subsequent M0 work. No material is discarded
+by mechanics; `total_mass()` includes the discard ledger.
+
+This is an unfinished prototype: grid construction, realistic plastic spreading,
+robust integration and realistic-scale performance have not been validated. Do not
+consider issue #9 or M0 complete based on the current unit tests alone.
