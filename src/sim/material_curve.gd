@@ -199,3 +199,19 @@ static func _components(value: Variant) -> PackedFloat64Array:
 	if value is int or value is float:
 		return PackedFloat64Array([float(value)])
 	return PackedFloat64Array(value)
+
+
+func export_graph() -> Dictionary:
+	if not errors.is_empty():
+		return {}
+	if _kind == "constant":
+		return {"constant": Array(_values[0]) if vector_value else _values[0][0]}
+	if _kind == "keys":
+		var keys: Array = []
+		for index in _times.size():
+			keys.append([_times[index], Array(_values[index]) if vector_value else _values[index][0]])
+		return {"axis": _axis, "interpolation": _interpolation, "keys": keys}
+	var inputs: Array = []
+	for child in _inputs:
+		inputs.append(child.export_graph())
+	return {"op": _kind, "inputs": inputs}

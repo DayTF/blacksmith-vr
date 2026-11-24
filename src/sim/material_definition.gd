@@ -51,6 +51,18 @@ func has_property(property: String) -> bool:
 	return _curves.has(property)
 
 
+func export_runtime() -> Dictionary:
+	var result := {"curves": {}, "phases": []}
+	for property: String in _curves:
+		result.curves[property] = _curves[property].export_graph()
+	for phase in _phases:
+		var curves: Dictionary = {}
+		for property: String in phase.curves:
+			curves[property] = phase.curves[property].export_graph()
+		result.phases.append({"temperature": phase.temperature, "curves": curves})
+	return result
+
+
 func _configure(data: Dictionary, defaults: Dictionary) -> void:
 	raw_data = data.duplicate(true)
 	if data.get("schema_version") != 1:

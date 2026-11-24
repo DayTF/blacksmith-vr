@@ -1,0 +1,151 @@
+{
+  "engine": "4.7.2.stable.official.ed1daf0bf Standard Linux x86_64",
+  "cpu": "AMD Ryzen 9 5900X 12-Core Processor; Microsoft virtualization/WSL",
+  "compiler": "GCC 9.4.0, CMake Release (-O3), floating-point contraction disabled",
+  "scope": "Whole GDScript step includes adapter overhead; kernel samples separately timed; construction, upload/ownership transfer and final dictionary snapshots excluded from resident step timing. Same 5000 nodes / 14050 links / 4104 cells and 4 substeps x 8 iterations.",
+  "reference_baseline": "mechanics-baseline.json",
+  "resident": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      15.143201,
+      19.736007,
+      16.968244,
+      14.635004,
+      13.713692
+    ],
+    "median_ms": 15.237,
+    "nodes": 5000,
+    "profiles_usec": [],
+    "profiling_enabled": false,
+    "samples_ms": [
+      15.237,
+      19.846,
+      17.048,
+      14.721,
+      13.797
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "compatibility": {
+    "active_cells": 4104,
+    "backend": "native-compatibility",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      14.157388,
+      14.944343,
+      14.023336,
+      13.713173,
+      13.732603
+    ],
+    "median_ms": 163.918,
+    "nodes": 5000,
+    "profiles_usec": [],
+    "profiling_enabled": false,
+    "samples_ms": [
+      163.595,
+      165.173,
+      162.016,
+      163.918,
+      164.985
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "instrumented_profile": {
+    "active_cells": 4104,
+    "backend": "native-resident",
+    "broken_links": 0,
+    "connections": 14050,
+    "finite_state": true,
+    "iterations": 8.0,
+    "kernel_samples_ms": [
+      14.836642,
+      13.574745,
+      14.311242,
+      13.86113,
+      14.828173
+    ],
+    "median_ms": 14.378,
+    "nodes": 5000,
+    "profiles_usec": [
+      {
+        "anvil_and_damping": 840.14,
+        "material_and_prediction": 217.349,
+        "orientation": 306.438,
+        "plasticity_and_setup": 1006.712,
+        "spring_constraints": 5088.485,
+        "validation_and_snapshot": 373.747,
+        "volume_constraints": 6956.722
+      },
+      {
+        "anvil_and_damping": 802.579,
+        "material_and_prediction": 147.46,
+        "orientation": 303.258,
+        "plasticity_and_setup": 733.703,
+        "spring_constraints": 4693.203,
+        "validation_and_snapshot": 386.516,
+        "volume_constraints": 6463.757
+      },
+      {
+        "anvil_and_damping": 899.422,
+        "material_and_prediction": 247.648,
+        "orientation": 322.007,
+        "plasticity_and_setup": 1095.41,
+        "spring_constraints": 4842.4,
+        "validation_and_snapshot": 379.476,
+        "volume_constraints": 6473.21
+      },
+      {
+        "anvil_and_damping": 795.005,
+        "material_and_prediction": 189.387,
+        "orientation": 304.408,
+        "plasticity_and_setup": 869.033,
+        "spring_constraints": 4674.717,
+        "validation_and_snapshot": 448.406,
+        "volume_constraints": 6534.125
+      },
+      {
+        "anvil_and_damping": 929.814,
+        "material_and_prediction": 187.338,
+        "orientation": 309.537,
+        "plasticity_and_setup": 1018.862,
+        "spring_constraints": 4940.234,
+        "validation_and_snapshot": 368.897,
+        "volume_constraints": 7018.781
+      }
+    ],
+    "profiling_enabled": true,
+    "samples_ms": [
+      14.907,
+      13.643,
+      14.378,
+      13.932,
+      14.897
+    ],
+    "substeps": 4.0,
+    "target_ms": 1.0,
+    "volume_cells": 4104,
+    "warmup_steps": 2.0
+  },
+  "resident_speedup_over_reference": 165.75395419045742,
+  "budget_met": false,
+  "platform_coverage": "Linux x86_64/WSL headless tested. Windows native build and XR hardware unvalidated.",
+  "reproduce": [
+    "godot --headless --path . --script tests/benchmark_mechanics.gd -- --backend=native-resident",
+    "godot --headless --path . --script tests/benchmark_mechanics.gd -- --backend=native-compatibility",
+    "godot --headless --path . --script tests/benchmark_mechanics.gd -- --backend=native-resident --profile"
+  ]
+}

@@ -6,3 +6,7 @@
 .agents/
 .aws/
 .codex/
+
+# Native build products and pinned dependency cache
+.build/
+native/bin/
