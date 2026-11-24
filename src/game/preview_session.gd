@@ -5,6 +5,7 @@ const Library = preload("res://src/sim/material_library.gd")
 const Billet = preload("res://src/sim/granular_billet.gd")
 const Grid = preload("res://src/sim/billet_grid.gd")
 const Thermal = preload("res://src/sim/thermal_model.gd")
+const Purification = preload("res://src/sim/forging_purification.gd")
 var materials := Library.new()
 var billet: RefCounted
 var config: Dictionary
@@ -23,6 +24,12 @@ var environments: Dictionary
 var boundary: Dictionary
 var exposed_areas := PackedFloat64Array()
 var phase_count := 0
+var purification: RefCounted
+var purified_nodes := PackedByteArray()
+var initial_impurity_mass := 0.0
+var _next_strike_at := 0.0
+var _last_sequence_strike := 0
+var _sequence_end_at := 0.0
 
 
 func initialize() -> bool:
@@ -41,6 +48,7 @@ func reset(prescribed_temperature: float) -> bool:
 	thermal_inspection = false
 	boundary = environments.environments[0]
 	phase_count = 0
+	purification = Purification.new(JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json")))
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	billet = Billet.new(materials, tuning)
 	var d: Array = config.dimensions
@@ -50,10 +58,19 @@ func reset(prescribed_temperature: float) -> bool:
 		errors = billet.errors
 		return false
 	exposed_areas = Grid.reference_exposed_areas(Vector3i(d[0], d[1], d[2]), config.spacing_m)
+	purified_nodes.resize(billet.nodes.size())
+	purified_nodes.fill(0)
+	initial_impurity_mass = 0.0
+	for node: Dictionary in billet.nodes:
+		for amount: float in node.impurity_mass.values():
+			initial_impurity_mass += amount
 	paused = false
 	finished = false
 	elapsed = 0.0
 	strikes = 0
+	_next_strike_at = config.strike_interval_s
+	_last_sequence_strike = int(config.strike_count)
+	_sequence_end_at = 0.0
 	_accumulator = 0.0
 	contact = Vector3(0, float(d[1] - 1) * config.spacing_m, config.strike_z_m[0])
 	return true
@@ -69,7 +86,7 @@ func advance(delta: float) -> bool:
 		return false
 	_accumulator = 0.0
 	elapsed += config.step_s
-	if not thermal_inspection and strikes < int(config.strike_count) and elapsed >= (strikes + 1) * config.strike_interval_s:
+	if not thermal_inspection and strikes < _last_sequence_strike and elapsed >= _next_strike_at:
 		var z: float = config.strike_z_m[strikes % config.strike_z_m.size()]
 		var top := 0.0
 		for node: Dictionary in billet.nodes:
@@ -82,6 +99,9 @@ func advance(delta: float) -> bool:
 			errors.append("Synthetic hammer did not contact the billet.")
 			return false
 		strikes += 1
+		_next_strike_at += float(config.strike_interval_s)
+		if strikes == _last_sequence_strike:
+			_sequence_end_at = elapsed + float(config.settle_s)
 	var started := Time.get_ticks_usec()
 	if thermal_inspection:
 		if not thermal.step(billet.nodes, billet.connections, exposed_areas, config.step_s, boundary):
@@ -91,9 +111,24 @@ func advance(delta: float) -> bool:
 	if not billet.step(config.step_s):
 		errors = billet.errors
 		return false
+	if not thermal_inspection:
+		if not purification.apply(billet):
+			errors = purification.errors
+			return false
+		for event: Dictionary in purification.events:
+			purified_nodes[event.node] = 1
 	step_ms = float(Time.get_ticks_usec() - started) / 1000.0
-	finished = not thermal_inspection and elapsed >= config.strike_count * config.strike_interval_s + config.settle_s
+	finished = not thermal_inspection and strikes >= _last_sequence_strike and elapsed >= _sequence_end_at
 	return true
+
+
+func resume_forging() -> void:
+	# Continue the same matter/history after reheating or a completed sequence.
+	thermal_inspection = false
+	paused = false
+	finished = false
+	_next_strike_at = elapsed + float(config.strike_interval_s)
+	_last_sequence_strike = strikes + int(config.strike_count)
 
 
 func inspect_environment(index: int) -> void:
@@ -109,6 +144,7 @@ func summary() -> Dictionary:
 	var minimum := INF
 	var maximum := -INF
 	var total := 0.0
+	var impurity_mass := 0.0
 	for link: Dictionary in billet.connections:
 		broken += int(link.broken)
 	for node: Dictionary in billet.nodes:
@@ -116,5 +152,9 @@ func summary() -> Dictionary:
 		minimum = minf(minimum, node.temperature)
 		maximum = maxf(maximum, node.temperature)
 		total += node.temperature
+		for amount: float in node.impurity_mass.values():
+			impurity_mass += amount
 	return {"broken": broken, "strain": strain / billet.nodes.size(), "nodes": billet.nodes.size(),
-		"temperature_min": minimum, "temperature_max": maximum, "temperature_mean": total / billet.nodes.size()}
+		"temperature_min": minimum, "temperature_max": maximum, "temperature_mean": total / billet.nodes.size(),
+		"impurity_mass_kg": impurity_mass, "discarded_mass_kg": billet.discarded_mass,
+		"purified_nodes": purified_nodes.count(1), "mass_accounted_kg": billet.total_mass()}

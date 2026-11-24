@@ -9,6 +9,9 @@ var nodes: Array[Dictionary] = []
 var connections: Array[Dictionary] = []
 var cells: Array[Dictionary] = []
 var discarded_mass := 0.0
+var discarded_impurity_mass: Dictionary = {}
+var step_id := 0
+var purification_step_id := 0
 var last_impulse := Vector3.ZERO
 var errors := PackedStringArray()
 var materials: Variant
@@ -230,6 +233,7 @@ func step(dt: float) -> bool:
 	for index in cells.size():
 		cells[index].active = active[index] != 0
 	Geometry.update_orientations(nodes, cells, positions, active)
+	step_id += 1
 	return true
 
 

@@ -14,5 +14,7 @@
   "hammer_velocity_m_s": [0, -0.1, 0],
   "strike_z_m": [-0.03, 0, 0.03],
   "hammer_lift_m": 0.06,
-  "emission_scale": 0.7
+  "emission_scale": 0.7,
+  "purification_marker_radius_m": 0.0012,
+  "purification_marker_color": [0.1, 1.0, 0.7, 1.0]
 }

@@ -6,6 +6,7 @@ var session := Session.new()
 var _surface := MeshInstance3D.new()
 var _wire := MeshInstance3D.new()
 var _hammer := MeshInstance3D.new()
+var _purification_sites := MultiMeshInstance3D.new()
 var _camera := Camera3D.new()
 var _status := Label.new()
 var _pause := Button.new()
@@ -20,6 +21,7 @@ var _smoke := false
 var _before_strike := false
 var _thermal_capture := false
 var _quench_capture := false
+var _verify_purification := false
 var _completed := false
 
 
@@ -31,6 +33,7 @@ func _ready() -> void:
 		_before_strike = _before_strike or argument == "--preview-before-strike"
 		_thermal_capture = _thermal_capture or argument == "--preview-heat" or argument == "--preview-quench"
 		_quench_capture = _quench_capture or argument == "--preview-quench"
+		_verify_purification = _verify_purification or argument == "--preview-purification"
 	if _smoke or not _capture_path.is_empty():
 		get_viewport().set_disable_input(true)
 	if not session.initialize():
@@ -102,6 +105,22 @@ func _build_stage() -> void:
 	hammer_material.metallic = 0.8
 	_hammer.material_override = hammer_material
 	add_child(_hammer)
+	var marker := SphereMesh.new()
+	marker.radius = session.config.purification_marker_radius_m
+	marker.height = marker.radius * 2
+	marker.radial_segments = 8
+	marker.rings = 4
+	var marker_material := StandardMaterial3D.new()
+	var rgba: Array = session.config.purification_marker_color
+	marker_material.albedo_color = Color(rgba[0], rgba[1], rgba[2], rgba[3])
+	marker_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	marker.material = marker_material
+	_purification_sites.multimesh = MultiMesh.new()
+	_purification_sites.multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	_purification_sites.multimesh.mesh = marker
+	_purification_sites.multimesh.instance_count = session.billet.nodes.size()
+	_purification_sites.multimesh.visible_instance_count = 0
+	add_child(_purification_sites)
 	add_child(_camera)
 	_camera.near = 0.005
 	_camera.far = 10.0
@@ -166,14 +185,21 @@ func _refresh() -> void:
 		for index: int in [link.a, link.b]:
 			lines.add_vertex(nodes[index].position + Vector3.UP * 0.00015)
 	_wire.mesh = lines.commit()
+	var marker_count := 0
+	for index in nodes.size():
+		if session.purified_nodes[index] != 0:
+			_purification_sites.multimesh.set_instance_transform(marker_count, Transform3D(Basis.IDENTITY, nodes[index].position))
+			marker_count += 1
+	_purification_sites.multimesh.visible_instance_count = marker_count
 	var phase: float = fmod(session.elapsed, session.config.strike_interval_s) / session.config.strike_interval_s
 	_hammer.position = session.contact + Vector3.UP * (0.01 + session.config.hammer_lift_m * sin(phase * PI))
 	if session.finished or session.thermal_inspection:
 		_hammer.position = Vector3(-0.07, 0.08, -0.06)
 	var summary: Dictionary = session.summary()
-	_status.text = "%s\n\n%.0f °C mean · %.0f–%.0f °C range\n%d matter points  ·  %d strikes\n%d broken links (red)\nMean plastic strain: %.4f\nLast sim + heat step: %.1f ms\n\n%s" % [
+	_status.text = "%s\n\n%.0f °C mean · %.0f–%.0f °C range\n%d matter points  ·  %d strikes\n%d broken links (red)\nMean plastic strain: %.4f\nImpurities: %.3f mg · slag: %.3f µg\nPurified surface points: %d\nLast sim + processes: %.1f ms\n\n%s" % [
 		session.materials.get_material(session.config.material_id).raw_data.name,
-		summary.temperature_mean, summary.temperature_min, summary.temperature_max, summary.nodes, session.strikes, summary.broken, summary.strain, session.step_ms,
+		summary.temperature_mean, summary.temperature_min, summary.temperature_max, summary.nodes, session.strikes, summary.broken, summary.strain,
+		summary.impurity_mass_kg * 1e6, summary.discarded_mass_kg * 1e9, summary.purified_nodes, session.step_ms,
 		"Paused" if session.paused else ("Thermal inspection · " + session.boundary.id if session.thermal_inspection else ("Demo complete — replay or inspect" if session.finished else "Synthetic impacts · constant temperature"))]
 
 
@@ -211,20 +237,27 @@ func _build_ui() -> void:
 		_pause.text = "Resume" if session.paused else "Pause"
 		_refresh())
 	column.add_child(_pause)
-	_environments.add_item("Thermal inspection: choose environment")
-	_environments.set_item_disabled(0, true)
+	_environments.add_item("Synthetic strikes · keep billet")
+	_environments.allow_reselect = true
 	for environment: Dictionary in session.environments.environments:
 		_environments.add_item(environment.name)
 		if session.thermal_inspection and environment.id == session.boundary.id:
 			_environments.select(_environments.item_count - 1)
 	_environments.item_selected.connect(func(index: int):
-		if index > 0:
+		if index == 0:
+			session.resume_forging()
+		else:
 			session.inspect_environment(index - 1)
-			_pause.text = "Pause"
-			_refresh())
+		_pause.text = "Pause"
+		_refresh())
 	column.add_child(_environments)
+	var sites := CheckButton.new()
+	sites.text = "Show impurity release sites"
+	sites.button_pressed = true
+	sites.toggled.connect(func(visible_sites: bool): _purification_sites.visible = visible_sites)
+	column.add_child(sites)
 	var note := Label.new()
-	note.text = "Right-drag: orbit · Wheel: zoom\n\nThermal inspection stops synthetic strikes.\nChange environment to heat/cool/quench.\nReplay returns to constant-temperature hits.\nProvisional fantasy data / fixed heat areas\nNo purification, folding or VR input yet.\nRed links show failure; mesh does not split."
+	note.text = "Right-drag: orbit · Wheel: zoom\n\nMode menu keeps the billet; Replay resets.\nFantasy tuning · No folding or VR input.\nRed: failure · Cyan: impurity release sites\nSurface mesh does not split at cracks yet."
 	note.add_theme_font_size_override("font_size", 14)
 	note.modulate = Color("a6b8ca")
 	column.add_child(note)
@@ -272,6 +305,14 @@ func _finish_capture() -> void:
 	var result: Dictionary = session.summary()
 	if _before_strike and (session.strikes != 0 or result.broken != 0 or result.strain != 0):
 		session.errors.append("Unstruck billet must have no damage or plastic strain.")
+		_fail()
+		return
+	if (_before_strike or _thermal_capture) and result.discarded_mass_kg != 0.0:
+		session.errors.append("Heat or an unstruck billet cannot forge away impurities.")
+		_fail()
+		return
+	if _verify_purification and (result.discarded_mass_kg <= 0.0 or result.purified_nodes == 0):
+		session.errors.append("The hot fixture must expel impurities from spreading surface matter.")
 		_fail()
 		return
 	if _thermal_capture:
