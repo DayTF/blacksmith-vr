@@ -310,7 +310,7 @@ var events = material.phase_events(1300.0, 1500.0)
   `requires_explicit_removal`. Graph paths are `processes.<process>.<property>`
   and `impurities.<id>.<process>.<property>`. Eligibility metadata is retained in
   `material.raw_data` (treat as read-only); sampling a graph **does not authorize
-  a process or perform purification**. The future solver must enforce eligibility,
+  a process or perform purification**. The process layer must enforce eligibility,
   surface exposure, plastic spreading, equipment limits and mass accounting.
 - Each impurity requires a unique id and finite `base_concentration` in [0,1];
   total starting concentration cannot exceed 1. Effects are retained as data,
@@ -321,9 +321,9 @@ var events = material.phase_events(1300.0, 1500.0)
   purification. These files do not establish real-world metallurgy.
 
 The material and granular mechanics layers have correctness tests. M0 remains
-open: surface purification (#11), folding/welding (#12),
+open: folding/welding (#12),
 melt separation (#13), and the complete forging harness (#14) remain. Thermal
-transport (#10) is implemented below. The early
+transport (#10) and surface purification (#11) are implemented below. The early
 desktop inspection scene (#35) is an authorized development-order exception;
 tracked VR input and XR performance have not been validated.
 
@@ -499,7 +499,7 @@ readiness. The latest user decision supersedes the previous development gate:
 prioritize a visible small-grid preview (#35), defer optimization (#33), and allow
 lower development frame rates. Keep the full benchmark unchanged and report the
 preview resolution separately. Remaining process/harness work is still
-#11–#14; thermal transport #10 is implemented below; M0 stays open until those criteria are satisfied.
+#12–#14; thermal transport #10 and purification #11 are implemented below; M0 stays open until those criteria are satisfied.
 
 ## Development order: visual feedback first (user decision)
 
@@ -514,8 +514,8 @@ existing mechanics, not a completed forging game or VR build. Scripted hammer
 impacts are the already approved synthetic prototype input; replay/pause controls
 are inspection tools, not button-driven player forging. The constant-temperature
 strike replay is distinct from the new live thermal inspection (#10). Keep these
-limits visible. Visible thermal behavior (#10) follows the initial preview; next is local surface
-purification (#11), and retain tracked controller integration in #15. Folding,
+limits visible. Visible thermal behavior (#10) and surface purification (#11) follow the initial
+preview; next is folding/welding (#12), and retain tracked controller integration in #15. Folding,
 welding and the full crafting lifecycle remain outstanding. Suggest trying the
 visual preview when available, accurately describing its limited interaction.
 
@@ -568,7 +568,7 @@ additional links and is not a like-for-like performance comparison. Future timin
 reports must label topology. No performance optimization is part of this fix.
 `--preview-before-strike` checks/captures the cold scene with zero hits, plastic
 strain and broken links, and is also exercised in CI. Visible thermal transport
-(#10) follows below; next is #11. Optimization #33 remains deferred.
+(#10) and purification (#11) follow below; next is #12. Optimization #33 remains deferred.
 
 
 ## Thermal transport and visual inspection (#10)
@@ -618,7 +618,83 @@ capture flags run six simulated seconds. CI verifies these and pre-impact cold
 stability as well as all five sim suites. Windows RTX 3080 Ti / Forward+ rendering
 is covered; XR is not. Re-run tools/prepare_preview.py after source updates.
 
-Next actionable simulation work: surface-only purification #11, followed by
-folding/welding #12 and equipment-limited separation #13. Keep optimization #33
+Next actionable simulation work: folding/welding #12, followed by
+equipment-limited separation #13 and the complete forging harness #14. Keep optimization #33
 deferred until more visual feedback is useful. M0 is still open; no full game loop
 or VR readiness is claimed.
+
+
+## Current surface exposure and forging purification (#11)
+
+`src/sim/billet_surface.gd` is an engine-light RefCounted geometry query. Construct
+with `data/sim/surface.json`, then `evaluate(nodes, cells)` returns `areas`
+(PackedFloat64Array), `exposed` (PackedByteArray) and `unresolved_cells`, or an empty
+dictionary with `errors`. It reads current geometry; it never changes matter.
+
+- Shared topological faces are internal. Remaining faces are split into nodal
+  dual patches. Outward probes test burial against other cells, including separate
+  unbonded layers; contact does not imply a weld. Containment uses each cell's
+  six-tetrahedron decomposition, with AABBs as a broad phase. Outward probe
+  distance is capped by represented tetrahedral thickness, so it cannot skip
+  through a thin contacting layer.
+- Interior points are not eligible merely because they have plastic strain.
+  Deformation changes face geometry. Moving/folding another component onto a
+  surface buries its patches; separating it exposes them again. Tests rotate a
+  separate component into a folded stack without homogenizing its local state.
+  This validates the exposure API, not a complete folding/manipulation system.
+- `cell.active` is a volume-constraint flag, **not matter deletion**. Damaged cells
+  still occlude. Degenerate/inverted decompositions emit no eligible faces and
+  conservatively occlude with their bounding boxes, reporting unresolved cells.
+  Fractured matter must not become a purification shortcut. Proper crack/fold
+  remeshing is still future work. Isolated spring points without matter cells
+  have no inferred exposed surface.
+- Exposure is coarse per granule: a point with an unburied dual-face patch is a
+  surface point. Probe/area/volume tolerances are numerical tuning. This query is
+  used for purification; the thermal fixture still uses its documented reference
+  areas rather than claiming full dynamic thermal contact.
+
+`src/sim/forging_purification.gd` is an explicit forging-process operator, constructed
+with the same surface tuning. Call `apply(billet) -> bool` after a successful
+mechanical step while forging. It works with reference/native billet adapters.
+Successful mechanical calls increment `step_id`; failures do not. The billet's
+`purification_step_id` ensures one application per successful step, including
+across replacement process objects. Never replay accumulated strain or a prior
+step's increments. Initialization alone creates no purification event.
+
+Both current surface exposure and positive `plastic_spreading_increment` are
+mandatory. Material `processes.forging.enabled` can veto removal when present;
+each impurity needs its own explicit forging enabled flag and removal_fraction
+graph. Missing material-level forging metadata imposes no additional restriction.
+Metadata cannot relax the user's unconditional surface/spreading requirements.
+For these process graphs, context `plastic_strain_increment` is the eligible
+**spreading** increment; `plastic_spreading_increment` also supplies it explicitly,
+and `total_plastic_strain_increment` exposes the mechanical total if needed.
+Temperature and accumulated hardening strain are also supplied. Invalid/missing
+fraction outputs fail explicitly; valid fractions are in [0,1]. Temperature
+windows come from the authored graphs, with no per-metal branches.
+
+Removal is a fraction of **remaining local impurity mass**. It subtracts that mass
+from both impurity and node mass, retains all host metal/unremoved impurities,
+and adds it to `discarded_mass`. `discarded_impurity_mass` records nested
+material-id/impurity-id masses. Total live + discarded mass is conserved. Velocities
+and temperature remain local; removal events retain the expelled mass's position,
+velocity and temperature for future debris. The process is transactional on bad
+state, curves or geometry. It preserves retained impurity dictionary views.
+The numerical mass roundoff tolerance allows only ledger summation roundoff.
+Current mechanics requires positive mass: exhausting a 100%-impurity granule fails
+atomically rather than inventing a residual mass or silently deleting topology.
+Mass is subtracted without inventing an impurity-density/volume contraction law.
+
+After success, `events`, `removed_mass` and `last_surface` describe this application.
+Repeated/no-new-step calls expose zero new removal/events. Heat-only inspection
+does not invoke this forging process, and heating cannot discard impurities.
+The preview shows remaining impurity mass, expelled micrograms and cumulative
+release-site markers (cyan, optional). The mode menu preserves the billet when
+switching among heat/quench and further synthetic strike sequences; Replay and
+temperature presets reset it. Strike inspection still holds temperatures constant
+for controlled comparisons; this is not the complete thermomechanical game loop.
+CI's hot fixture uses `--preview-purification` to require actual removal, while
+thermal/unstruck captures require zero removal. All six sim suites cover locality,
+fold burial/re-exposure, elastic/compression exclusions, fractional removal,
+process eligibility, atomic failures, native ownership and retained-billet cycles.
+Next is #12; no VR manipulation, welding, final item stats or inventory is claimed.

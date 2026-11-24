@@ -11,6 +11,14 @@ var _pending_download := false
 var _catalog_revision := -1
 var _last_impulse := Vector3.ZERO
 var errors := PackedStringArray()
+var step_id: int:
+	get: return _reference.step_id
+var purification_step_id: int:
+	get: return _reference.purification_step_id
+	set(value): _reference.purification_step_id = value
+var discarded_impurity_mass: Dictionary:
+	get: return _reference.discarded_impurity_mass
+	set(value): _reference.discarded_impurity_mass = value
 
 var nodes: Array[Dictionary]:
 	get:
@@ -123,6 +131,7 @@ func step(dt: float) -> bool:
 	var success: bool = _core.step(dt)
 	errors = _core.get_errors()
 	if success:
+		_reference.step_id += 1
 		_pending_download = true
 		if _views_exposed:
 			_sync_out()
