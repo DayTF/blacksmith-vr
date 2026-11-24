@@ -1,8 +1,10 @@
 extends RefCounted
-## Scripted inspection harness. This prescribes temperature, not a thermal solver.
+## Synthetic mechanics inspection plus optional live thermal inspection.
 
 const Library = preload("res://src/sim/material_library.gd")
 const Billet = preload("res://src/sim/granular_billet.gd")
+const Grid = preload("res://src/sim/billet_grid.gd")
+const Thermal = preload("res://src/sim/thermal_model.gd")
 var materials := Library.new()
 var billet: RefCounted
 var config: Dictionary
@@ -15,10 +17,17 @@ var step_ms := 0.0
 var contact := Vector3.ZERO
 var temperature := 1000.0
 var _accumulator := 0.0
+var thermal: RefCounted
+var thermal_inspection := false
+var environments: Dictionary
+var boundary: Dictionary
+var exposed_areas := PackedFloat64Array()
+var phase_count := 0
 
 
 func initialize() -> bool:
 	config = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/billet.json"))
+	environments = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/environments.json"))
 	if not materials.load_directory("res://data/materials"):
 		errors = materials.errors
 		return false
@@ -28,6 +37,10 @@ func initialize() -> bool:
 func reset(prescribed_temperature: float) -> bool:
 	errors.clear()
 	temperature = prescribed_temperature
+	thermal = Thermal.new(materials, JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/thermal.json")))
+	thermal_inspection = false
+	boundary = environments.environments[0]
+	phase_count = 0
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	billet = Billet.new(materials, tuning)
 	var d: Array = config.dimensions
@@ -36,6 +49,7 @@ func reset(prescribed_temperature: float) -> bool:
 			Vector3(o[0], o[1], o[2]), config.material_id, temperature, "preview-layer"):
 		errors = billet.errors
 		return false
+	exposed_areas = Grid.reference_exposed_areas(Vector3i(d[0], d[1], d[2]), config.spacing_m)
 	paused = false
 	finished = false
 	elapsed = 0.0
@@ -55,7 +69,7 @@ func advance(delta: float) -> bool:
 		return false
 	_accumulator = 0.0
 	elapsed += config.step_s
-	if strikes < int(config.strike_count) and elapsed >= (strikes + 1) * config.strike_interval_s:
+	if not thermal_inspection and strikes < int(config.strike_count) and elapsed >= (strikes + 1) * config.strike_interval_s:
 		var z: float = config.strike_z_m[strikes % config.strike_z_m.size()]
 		var top := 0.0
 		for node: Dictionary in billet.nodes:
@@ -69,19 +83,38 @@ func advance(delta: float) -> bool:
 			return false
 		strikes += 1
 	var started := Time.get_ticks_usec()
+	if thermal_inspection:
+		if not thermal.step(billet.nodes, billet.connections, exposed_areas, config.step_s, boundary):
+			errors = thermal.errors
+			return false
+		phase_count += thermal.phase_events.size()
 	if not billet.step(config.step_s):
 		errors = billet.errors
 		return false
 	step_ms = float(Time.get_ticks_usec() - started) / 1000.0
-	finished = elapsed >= config.strike_count * config.strike_interval_s + config.settle_s
+	finished = not thermal_inspection and elapsed >= config.strike_count * config.strike_interval_s + config.settle_s
 	return true
+
+
+func inspect_environment(index: int) -> void:
+	thermal_inspection = true
+	boundary = environments.environments[index]
+	paused = false
+	finished = false
 
 
 func summary() -> Dictionary:
 	var broken := 0
 	var strain := 0.0
+	var minimum := INF
+	var maximum := -INF
+	var total := 0.0
 	for link: Dictionary in billet.connections:
 		broken += int(link.broken)
 	for node: Dictionary in billet.nodes:
 		strain += float(node.plastic_strain)
-	return {"broken": broken, "strain": strain / billet.nodes.size(), "nodes": billet.nodes.size()}
+		minimum = minf(minimum, node.temperature)
+		maximum = maxf(maximum, node.temperature)
+		total += node.temperature
+	return {"broken": broken, "strain": strain / billet.nodes.size(), "nodes": billet.nodes.size(),
+		"temperature_min": minimum, "temperature_max": maximum, "temperature_mean": total / billet.nodes.size()}

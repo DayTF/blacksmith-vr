@@ -1,0 +1,9 @@
+{
+  "description": "Provisional thermal integration tuning; SI units and Celsius inputs.",
+  "maximum_step_s": 0.03333333333333333,
+  "maximum_substeps": 4096,
+  "stability_fraction": 0.8,
+  "minimum_length_m": 1e-8,
+  "kelvin_offset": 273.15,
+  "stefan_boltzmann_w_m2k4": 5.670374419e-8
+}

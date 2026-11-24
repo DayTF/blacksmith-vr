@@ -48,6 +48,8 @@ static func populate(billet: Variant, dimensions: Vector3i, spacing: float,
 					if link < 0:
 						billet.errors.append("Grid links collapsed or exceeded representable geometry.")
 						return false
+					# Dual-cell heat interfaces use geometry, independently of spring tuning.
+					billet.connections[link]["thermal_area_m2"] = area / billet.tuning.spring_area_m2 * spacing * spacing
 					links[Vector2i(a, b)] = link
 	var positions: Array[Vector3] = []
 	for node: Dictionary in billet.nodes:
@@ -86,10 +88,35 @@ static func populate(billet: Variant, dimensions: Vector3i, spacing: float,
 								if neighbor.x < 0 or neighbor.y < 0 or neighbor.z < 0 or neighbor.x >= dimensions.x or neighbor.y >= dimensions.y or neighbor.z >= dimensions.z:
 									continue
 								var b := _index(neighbor, dimensions)
-								if b > a and billet.connect_nodes(a, b, billet.tuning.spring_area_m2 * bracing, billet.tuning.damping_ns_per_m) < 0:
-									billet.errors.append("Invalid diagonal brace geometry.")
-									return false
+								if b > a:
+									var link: int = billet.connect_nodes(a, b, billet.tuning.spring_area_m2 * bracing, billet.tuning.damping_ns_per_m)
+									if link < 0:
+										billet.errors.append("Invalid diagonal brace geometry.")
+										return false
+									billet.connections[link]["thermal_area_m2"] = 0.0
 	return true
+
+
+static func reference_exposed_areas(dimensions: Vector3i, spacing: float) -> PackedFloat64Array:
+	# Initial regular-grid fixture boundary, not fracture/folding surface detection.
+	var result := PackedFloat64Array()
+	if dimensions.x < 2 or dimensions.y < 2 or dimensions.z < 2 or not is_finite(spacing) or spacing <= 0:
+		return result
+	for z in dimensions.z:
+		for y in dimensions.y:
+			for x in dimensions.x:
+				var point := Vector3i(x, y, z)
+				var area := 0.0
+				for axis in 3:
+					if point[axis] != 0 and point[axis] != dimensions[axis] - 1:
+						continue
+					var face_area := spacing * spacing
+					for transverse in 3:
+						if transverse != axis and (point[transverse] == 0 or point[transverse] == dimensions[transverse] - 1):
+							face_area *= 0.5
+					area += face_area
+				result.append(area)
+	return result
 
 
 static func _index(point: Vector3i, dimensions: Vector3i) -> int:
