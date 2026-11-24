@@ -84,7 +84,11 @@ func apply(billet: RefCounted) -> bool:
 		for impurity: Dictionary in material.raw_data.impurities:
 			var policy: Dictionary = impurity.get("processes", {}).get("forging", {})
 			var amount: float = impurities.get(impurity.id, 0.0)
-			if not policy.get("enabled", false) or amount == 0:
+			var pool: Dictionary = node.get("separated_impurities", {}).get(impurity.id, {})
+			var reserved: Variant = pool.get("mass_kg", 0.0)
+			if not _number(reserved) or reserved < 0.0 or reserved > amount:
+				return _fail("Separated impurity mass exceeds local inventory.")
+			if not policy.get("enabled", false) or amount == reserved:
 				continue
 			# The process graph receives only the strain eligible for this process.
 			var context := {"temperature": node.temperature, "plastic_strain": node.plastic_strain,
@@ -93,7 +97,7 @@ func apply(billet: RefCounted) -> bool:
 			var fraction: Variant = material.sample("impurities.%s.forging.removal_fraction" % impurity.id, context)
 			if not _number(fraction) or fraction < 0.0 or fraction > 1.0:
 				return _fail("Forging removal fraction must be finite and within [0, 1].")
-			var loss: float = amount * fraction
+			var loss: float = (amount - float(reserved)) * fraction
 			if loss == 0:
 				continue
 			impurities[impurity.id] = amount - loss

@@ -46,6 +46,7 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 	var remaining := dt
 	var substeps := 0
 	var events: Array[Dictionary] = []
+	var solidified := {}
 	var external_energy := 0.0
 	while remaining > 0.0:
 		substeps += 1
@@ -113,7 +114,14 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 			var strain: float = strains[index] * exp(-recovery[index] * h)
 			if not is_finite(next) or not is_finite(strain):
 				return _fail("Nonfinite thermal result; state retained.")
-			for event: Dictionary in materials.get_material(nodes[index].material_id).phase_events(previous, next):
+			var material: RefCounted = materials.get_material(nodes[index].material_id)
+			if nodes[index].has("separated_impurities") and not solidified.has(index):
+				var melt: Variant = material.sample("melt_fraction", {"temperature": next, "plastic_strain": strain})
+				if not _number(melt) or melt < 0.0 or melt > 1.0:
+					return _fail("Invalid melt fraction; state retained.")
+				if melt == 0.0:
+					solidified[index] = true
+			for event: Dictionary in material.phase_events(previous, next):
 				var local := event.duplicate(true)
 				local["node"] = index
 				events.append(local)
@@ -126,6 +134,8 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 	for index in nodes.size():
 		nodes[index].temperature = temperatures[index]
 		nodes[index].plastic_strain = strains[index]
+	for index in solidified:
+		nodes[index].erase("separated_impurities")
 	phase_events = events
 	boundary_energy_j = external_energy
 	return true

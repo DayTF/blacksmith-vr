@@ -6,6 +6,7 @@ const Billet = preload("res://src/sim/granular_billet.gd")
 const Layered = preload("res://src/sim/layered_forging.gd")
 const Surface = preload("res://src/sim/billet_surface.gd")
 const Thermal = preload("res://src/sim/thermal_model.gd")
+const Separation = preload("res://src/sim/melt_separation.gd")
 const Purification = preload("res://src/sim/forging_purification.gd")
 
 var _materials := Library.new()
@@ -126,6 +127,35 @@ func _replay() -> bool:
 	if absf(_billet.total_mass() - _initial_mass) > parameters.mass_roundoff_tolerance_kg:
 		return _fail("The replay failed to conserve live plus discarded mass.")
 	_checkpoint("quenched", {"layered_identity_preserved": true})
+	return _replay_molten_interval()
+
+
+func _replay_molten_interval() -> bool:
+	# A separate charge demonstrates refining within one molten interval.
+	_billet = Billet.new(_materials, _data("mechanics"))
+	var equipment := _data("refining_equipment")
+	var crucible: Dictionary = equipment.refining_crucible
+	var temperature: float = crucible.maximum_temperature_c
+	var material: String = _config.base_material
+	if not _billet.build_grid(Vector3i(2, 2, 2), _config.spacing_m, Vector3.ZERO,
+			material, temperature, "refining-charge"):
+		return _fail("Could not prepare the preheated refining charge.", _billet.errors)
+	var refining := Separation.new()
+	var initial_mass: float = _billet.total_mass()
+	if not refining.advance(_billet, equipment.forge, _config.refining_interval_s) or refining.moved_mass != 0.0:
+		return _fail("The forge must leave this charge unseparated.", refining.errors)
+	if not refining.advance(_billet, crucible, _config.refining_interval_s) or refining.moved_mass <= 0.0:
+		return _fail("The refining crucible did not separate impurities.", refining.errors)
+	var separated := refining.moved_mass
+	if _billet.discarded_mass != 0.0 or _billet.total_mass() != initial_mass:
+		return _fail("Migration changed the charge mass or discard ledger.")
+	_checkpoint("melt_separated", {"separated_mass_kg": separated})
+	if not refining.skim(_billet, crucible):
+		return _fail("Skimming the charge failed.", refining.errors)
+	var tolerance: float = _data("surface").mass_roundoff_tolerance_kg
+	if absf(refining.removed_mass - separated) > tolerance or absf(_billet.total_mass() - initial_mass) > tolerance:
+		return _fail("Skimming failed to account for the migrated mass.")
+	_checkpoint("melt_skimmed", {"skimmed_mass_kg": refining.removed_mass})
 	return true
 
 

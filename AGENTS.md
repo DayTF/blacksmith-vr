@@ -752,3 +752,27 @@ is 15.102 ms median over five samples after two warmup steps at 5,000 nodes,
 and the large benchmark excludes thermal/process work, startup and logging.
 The <1 ms production target remains unmet. M0 validation still depends on #13
 and the performance gate. The visual-first desktop development exception remains.
+
+## Melt separation (#13)
+
+`src/sim/melt_separation.gd` stages rate-based migration during a molten
+interval. `advance(billet, equipment, dt)` uses local melt fraction, the
+material separation efficiency and each impurity's separation rate. Equipment
+sets a temperature cap and permissible destinations. The provisional fixtures
+are in `data/sim/refining_equipment.json`.
+
+Staged entries in a node's `separated_impurities` dictionary are a subset of
+its `impurity_mass`. Migration alone does not change either matter mass or
+the discard ledger. `skim` releases the surface pool and `drain` releases
+the bottom pool, subtracting exactly that mass from the originating nodes and
+crediting the common discard ledger. Each call stages changes before committing.
+
+The user decided in #42 that unskimmed pools reset at solidification.
+Thermal transport clears the staging metadata when the local melt fraction
+reaches zero. The remaining impurity and matter masses stay at their original
+points, so remelting requires a new separation interval. While a pool is
+staged, surface forging can only remove the unstaged fraction.
+
+The headless forging replay also runs a separate preheated refining charge.
+Its molten checkpoints verify the forge cap, migration without discard and
+explicit skimming with conserved accounted mass.
