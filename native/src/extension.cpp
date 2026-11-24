@@ -271,6 +271,7 @@ class BlacksmithNativeCore : public RefCounted {
             !number(d, "maximum_step_s", p.maximum_step) ||
             !number(d, "minimum_length_m", p.minimum_length) ||
             !number(d, "anvil_height_m", p.anvil) ||
+            (d.has("anvil_friction_coefficient") && !number(d, "anvil_friction_coefficient", p.anvil_friction)) ||
             !number(d, "hammer_impulse_transfer", p.transfer) ||
             !number(d, "hammer_contact_depth_m", p.depth) ||
             !number(d, "contact_tolerance_m", p.tolerance) || !number(d, "substeps", substeps) ||

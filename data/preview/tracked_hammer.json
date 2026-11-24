@@ -1,6 +1,7 @@
 {
   "grip_to_face_m": [0, -0.04, -0.15],
   "anvil_height_m": 0.9,
+  "anvil_friction_coefficient": 0.45,
   "anvil_reach_m": 0.6,
   "maximum_sample_gap_s": 0.1,
   "maximum_sample_travel_m": 0.25,

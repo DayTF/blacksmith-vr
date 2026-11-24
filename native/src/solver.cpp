@@ -120,7 +120,8 @@ bool Material::properties(double temperature, double strain, bool bulk,
 bool Parameters::valid() const {
     return std::isfinite(minimum_step) && minimum_step > 0 && std::isfinite(maximum_step) &&
            maximum_step >= minimum_step && std::isfinite(minimum_length) && minimum_length > 0 &&
-           std::isfinite(anvil) && gravity.finite() && substeps > 0 && iterations > 0 &&
+           std::isfinite(anvil) && std::isfinite(anvil_friction) && anvil_friction >= 0 &&
+           gravity.finite() && substeps > 0 && iterations > 0 &&
            std::isfinite(transfer) && transfer >= 0 && transfer <= 1 && std::isfinite(depth) &&
            depth >= 0 && std::isfinite(tolerance) && tolerance >= 0;
 }
@@ -155,12 +156,18 @@ Volume volume(const std::vector<Node> &nodes, const Cell &cell) {
 }
 
 template <typename Point>
-static void project_anvil(std::vector<Point> &nodes, double anvil, double h) {
-    for (auto &n : nodes)
+static void project_anvil(std::vector<Point> &nodes, double anvil, double h,
+                          std::vector<double> &support) {
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        auto &n = nodes[i];
         if (n.position.y < anvil) {
-            n.velocity.y += (anvil - n.position.y) / h;
+            const double correction = (anvil - n.position.y) / h;
+            n.velocity.y += correction;
             n.position.y = static_cast<float>(anvil);
+            if (!support.empty())
+                support[i] += correction;
         }
+    }
 }
 
 bool Solver::step(double dt) {
@@ -229,6 +236,7 @@ bool Solver::step(double dt) {
     record(0, phase_start);
     for (int substep = 0; substep < parameters.substeps; ++substep) {
         phase_start = now();
+        anvil_support.assign(parameters.anvil_friction > 0 ? work.nodes.size() : 0, 0);
         for (size_t i = 0; i < work.nodes.size(); ++i) {
             auto &n = work.nodes[i];
             if (!materials[n.material].properties(n.temperature, n.strain, !work.cells.empty(),
@@ -238,7 +246,7 @@ bool Solver::step(double dt) {
             }
             n.position += n.velocity * h;
         }
-        project_anvil(work.nodes, parameters.anvil, h);
+        project_anvil(work.nodes, parameters.anvil, h, anvil_support);
         record(1, phase_start);
         phase_start = now();
         plasticity();
@@ -247,7 +255,7 @@ bool Solver::step(double dt) {
             n.velocity += parameters.gravity * h;
             n.position += parameters.gravity * h * h;
         }
-        project_anvil(work.nodes, parameters.anvil, h);
+        project_anvil(work.nodes, parameters.anvil, h, anvil_support);
         lambdas.assign(work.links.size(), 0);
         volume_lambdas.assign(work.cells.size(), 0);
         // Compliance and inverse masses do not vary during projection iterations.
@@ -283,7 +291,7 @@ bool Solver::step(double dt) {
             solve_volumes(inverse_h);
             record(4, phase_start);
             phase_start = now();
-            project_anvil(projection_points, parameters.anvil, h);
+            project_anvil(projection_points, parameters.anvil, h, anvil_support);
             record(5, phase_start);
         }
         phase_start = now();
@@ -292,9 +300,24 @@ bool Solver::step(double dt) {
             work.nodes[i].velocity = projection_points[i].velocity;
         }
         damp(h);
-        for (auto &n : work.nodes)
-            if (n.position.y <= parameters.anvil && n.velocity.y < 0)
+        for (size_t i = 0; i < work.nodes.size(); ++i) {
+            auto &n = work.nodes[i];
+            if (n.position.y <= parameters.anvil && n.velocity.y < 0) {
+                if (!anvil_support.empty())
+                    anvil_support[i] -= n.velocity.y;
                 n.velocity.y = 0;
+            }
+            if (!anvil_support.empty() && anvil_support[i] > 0) {
+                const V tangent{n.velocity.x, 0, n.velocity.z};
+                const double speed = tangent.length();
+                if (speed > 0) {
+                    // Coulomb budget in velocity units. Friction cannot reverse slip.
+                    const V reduced = tangent * std::max(0.0, 1 - parameters.anvil_friction * anvil_support[i] / speed);
+                    n.velocity.x = reduced.x;
+                    n.velocity.z = reduced.z;
+                }
+            }
+        }
         record(5, phase_start);
     }
     phase_start = now();
