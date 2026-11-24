@@ -1,0 +1,35 @@
+{
+  "active_cells": 4104,
+  "backend": "native-resident",
+  "broken_links": 0,
+  "connections": 14050,
+  "cpu": "AMD Ryzen 9 5900X",
+  "finite_state": true,
+  "godot_version": "4.7.2-stable Standard",
+  "iterations": 8.0,
+  "kernel_samples_ms": [
+    15.005942,
+    15.474584,
+    15.058622,
+    15.396608,
+    14.923178
+  ],
+  "measurement": "M0 mechanics-only warmed checkpoint after #12. Historical axial benchmark fixture, separate from the small process replay.",
+  "median_ms": 15.102,
+  "nodes": 5000,
+  "platform": "Linux x86_64, WSL2 5.15.167.4",
+  "profiles_usec": [],
+  "profiling_enabled": false,
+  "samples_ms": [
+    15.06,
+    15.523,
+    15.102,
+    15.44,
+    14.969
+  ],
+  "substeps": 4.0,
+  "target_met": false,
+  "target_ms": 1.0,
+  "volume_cells": 4104,
+  "warmup_steps": 2.0
+}

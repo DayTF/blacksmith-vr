@@ -734,6 +734,25 @@ cold failures, weaker and full bonds, strike gating and conservation through
 native/reference mechanics steps. The scripted API is for M0 and the future
 forging harness. The desktop preview and XR input are unaffected. Next is #13.
 
+## Standalone M0 forging replay (#14)
+
+Run `godot --headless --path . --script tests/forging_harness.gd`.
+The JSON lines log individual positions, temperatures, layer and material IDs,
+local impurities, and discarded impurity/matter mass. A 75-point, two-material
+fixture heats, folds, welds, cools to the working range, spreads and purifies
+under scripted strikes, then quenches. The script checks interface burial,
+a successful weld, eligibility of every purification event, retention of
+constituents/layers, and live-plus-discarded mass conservation. CI runs the replay.
+
+Use `tests/benchmark_mechanics.gd -- --backend=native-resident` for the separately
+timed full-size mechanics workload. The #14 checkpoint on WSL2 / Ryzen 9 5900X
+is 15.102 ms median over five samples after two warmup steps at 5,000 nodes,
+14,050 connections and 4,104 volume cells. See
+`benchmarks/forging-harness-mechanics.json`. The replay is deliberately small,
+and the large benchmark excludes thermal/process work, startup and logging.
+The <1 ms production target remains unmet. M0 validation still depends on #13
+and the performance gate. The visual-first desktop development exception remains.
+
 ## Melt separation in progress (#13)
 
 `src/sim/melt_separation.gd` stages rate-based migration during a molten

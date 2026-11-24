@@ -90,3 +90,16 @@ purification, not treated as holes. Fully exhausting an all-impurity granule is
 rejected atomically; zero-mass topology deletion is not implemented.
 
 ![Surface impurity removal](docs/previews/purification-hot.png)
+
+## Headless forging replay
+
+```sh
+godot --headless --path . --script tests/forging_harness.gd
+godot --headless --path . --script tests/benchmark_mechanics.gd -- --backend=native-resident
+```
+
+The replay emits JSON checkpoints for a mixed-material billet through heating,
+folding, welding, spreading with surface purification, and quenching. Each
+checkpoint records local positions, temperatures and impurity masses.
+The separate 5,000-node mechanics benchmark measured 15.102 ms per warmed
+step against the 1 ms budget. [Benchmark samples](benchmarks/forging-harness-mechanics.json)
