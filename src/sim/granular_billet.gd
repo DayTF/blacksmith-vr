@@ -180,6 +180,7 @@ func step(dt: float) -> bool:
 	var h := dt / int(tuning.substeps)
 	var gravity := Vector3(tuning.gravity_m_s2[0], tuning.gravity_m_s2[1], tuning.gravity_m_s2[2])
 	var friction: float = tuning.get("anvil_friction_coefficient", 0.0)
+	var density_limit: float = tuning.get("maximum_density_multiplier", 0.0)
 	var support := PackedFloat64Array()
 	if friction > 0.0:
 		support.resize(nodes.size())
@@ -210,7 +211,16 @@ func step(dt: float) -> bool:
 		for iteration in int(tuning.iterations):
 			_solve_links(positions, velocities, rests, stiffnesses, broken, lambdas, h)
 			_solve_volumes(positions, velocities, properties, active, volume_lambdas, h)
+			if density_limit > 0.0:
+				_solve_compression_limit(positions, velocities, h, density_limit)
 			_project_anvil(positions, velocities, h, support)
+		# Resolve remaining density/anvil coupling without changing normal spring iteration counts.
+		if density_limit > 0.0 and substep == int(tuning.substeps) - 1:
+			for correction_pass in int(tuning.iterations):
+				if _compression_resolved(positions, density_limit):
+					break
+				_solve_compression_limit(positions, velocities, h, density_limit)
+				_project_anvil(positions, velocities, h, support)
 		_damp(positions, velocities, broken, h)
 		for index in nodes.size():
 			if positions[index].y <= tuning.anvil_height_m and velocities[index].y < 0.0:
@@ -224,6 +234,9 @@ func step(dt: float) -> bool:
 					var reduced := tangent * maxf(0.0, 1.0 - friction * support[index] / speed)
 					velocities[index].x = reduced.x
 					velocities[index].z = reduced.z
+	if density_limit > 0.0 and not _compression_resolved(positions, density_limit):
+		errors.append("Compression limit did not converge; state retained.")
+		return false
 	# Candidate arrays make failed updates transactional, including fracture/strain.
 	for index in nodes.size():
 		if not positions[index].is_finite() or not velocities[index].is_finite() or not is_finite(strains[index]):
@@ -355,6 +368,59 @@ func _solve_volumes(positions: Array[Vector3], velocities: Array[Vector3], prope
 		lambdas[index] += change
 
 
+func _solve_compression_limit(positions: Array[Vector3], velocities: Array[Vector3],
+		h: float, density_limit: float) -> void:
+	# Regular-grid tetrahedra start with one sixth of the reference cell volume.
+	# For fixed local mass, the density multiplier is the inverse volume ratio.
+	for cell in cells:
+		var minimum: float = cell.rest_volume / (6.0 * density_limit)
+		var ids: PackedInt32Array = cell.nodes
+		for tetra: Array in Geometry.TETRAHEDRA:
+			var root: Vector3 = positions[ids[0]]
+			var a: Vector3 = positions[ids[tetra[1]]] - root
+			var b: Vector3 = positions[ids[tetra[2]]] - root
+			var c: Vector3 = positions[ids[7]] - root
+			var ga := b.cross(c) / 6.0
+			var volume := a.dot(ga)
+			if volume >= minimum:
+				continue
+			var gb := c.cross(a) / 6.0
+			var gc := a.cross(b) / 6.0
+			var points := [ids[0], ids[tetra[1]], ids[tetra[2]], ids[7]]
+			var gradients := [-ga - gb - gc, ga, gb, gc]
+			var denominator := 0.0
+			for i in 4:
+				var id: int = points[i]
+				var gradient: Vector3 = gradients[i]
+				if positions[id].y <= tuning.anvil_height_m and gradient.y < 0.0:
+					gradient.y = 0.0
+					gradients[i] = gradient
+				denominator += gradient.length_squared() / nodes[id].mass
+			if denominator <= 0.0:
+				continue
+			var change := (minimum - volume) / denominator
+			for i in 4:
+				var id: int = points[i]
+				var correction: Vector3 = gradients[i] * (change / nodes[id].mass)
+				positions[id] += correction
+				velocities[id] += correction / h
+
+
+func _compression_resolved(positions: Array[Vector3], density_limit: float) -> bool:
+	# Allow up to 1% volume residual from the fixed number of projections.
+	for cell in cells:
+		var minimum_six_volume: float = 0.99 * cell.rest_volume / density_limit
+		var ids: PackedInt32Array = cell.nodes
+		var root := positions[ids[0]]
+		var diagonal := positions[ids[7]] - root
+		for tetra: Array in Geometry.TETRAHEDRA:
+			var a := positions[ids[tetra[1]]] - root
+			var b := positions[ids[tetra[2]]] - root
+			if a.dot(b.cross(diagonal)) < minimum_six_volume:
+				return false
+	return true
+
+
 func _damp(positions: Array[Vector3], velocities: Array[Vector3], broken: PackedByteArray, h: float) -> void:
 	for index in connections.size():
 		if broken[index] != 0:
@@ -407,6 +473,9 @@ func _properties(strains: PackedFloat64Array) -> Array[Dictionary]:
 
 
 func _parameters_valid() -> bool:
+	var density_limit: Variant = tuning.get("maximum_density_multiplier", 0.0)
+	if not _number(density_limit) or (density_limit != 0.0 and density_limit < 1.0):
+		return false
 	var friction: Variant = tuning.get("anvil_friction_coefficient", 0.0)
 	if not _number(friction) or friction < 0.0:
 		return false

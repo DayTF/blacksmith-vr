@@ -832,3 +832,20 @@ accumulates its normal velocity corrections each substep. Tangential slip is
 then reduced by at most the coefficient times that support. The update cannot
 reverse slip and leaves airborne points alone. The tracked preview opts into
 a provisional coefficient of 0.45 in `data/preview/tracked_hammer.json`.
+
+## Density-limited compression (#49)
+
+The optional `maximum_density_multiplier` tuning sets a local density ceiling
+relative to a regular grid cell at its reference volume. Zero retains the old
+fixture/benchmark behavior. For fixed local mass the ratio is inverse volume,
+so each of the six signed tetrahedra receives a one-sided volume projection.
+The projection still applies in fractured cells, which retain represented
+matter even with the elastic volume constraint disabled. It adds no tensile
+restoration across a crack. Below-ground corrections remain constrained by
+the anvil.
+
+The SteamVR fixture uses a provisional multiplier of 1.25, targeting a minimum
+80% reference volume per tetrahedron with 1% solver residual tolerance. The final substep can use one extra density/anvil-only pass budget for
+strong impacts. A step that cannot satisfy the bound within that budget keeps its previous
+committed state and reports nonconvergence. This is a geometry constraint,
+not a change to the material density curve or the refining mass accounting.
