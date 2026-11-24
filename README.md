@@ -71,8 +71,8 @@ The preview has been rendered on Windows / RTX 3080 Ti / Vulkan Forward+ and run
 headlessly on Linux/WSL. No XR headset or tracked input is validated yet.
 
 Work is tracked in [GitHub issues](https://github.com/DayTF/blacksmith-vr/issues).
-The next priorities are layered folding/welding (#12), broader manipulation
-and XR integration (#15). Optimization (#33) remains deferred.
+The next priorities are melt separation (#13), the forging harness (#14), and
+tracked input (#15). Optimization (#33) remains deferred.
 
 Thermal inspection currently uses reference grid surface areas and assumes the
 whole boundary sees the selected environment. It does not model anvil heat
@@ -84,8 +84,8 @@ work-hardening recovery now implemented.
 
 
 Current geometric surface queries account for buried/contacting layers, even
-before welding; scripted fold fixtures are tested. The preview does not yet have
-a folding control. Failed/inverted cells are conservatively ineligible for
+before welding. The headless simulation supports scripted stacking, folding, and
+hammer-driven welds (#12). The desktop preview has no folding control. Failed/inverted cells are conservatively ineligible for
 purification, not treated as holes. Fully exhausting an all-impurity granule is
 rejected atomically; zero-mass topology deletion is not implemented.
 

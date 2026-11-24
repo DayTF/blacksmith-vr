@@ -13,7 +13,7 @@ func _init(parameters: Dictionary) -> void:
 	tuning = parameters.duplicate(true)
 
 
-func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary]) -> Dictionary:
+func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary], include_boundary: bool = false) -> Dictionary:
 	errors.clear()
 	for key in ["probe_offset_m", "probe_cell_fraction", "minimum_tetra_volume_m3", "minimum_face_area_m2", "barycentric_tolerance"]:
 		var value: Variant = tuning.get(key)
@@ -69,7 +69,8 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary]) -> Dictionary:
 		bodies.append({"bounds": AABB(lower, upper - lower).grow(tuning.probe_offset_m),
 			"tetrahedra": tetrahedra, "valid": valid, "center": center})
 		unresolved += int(not valid)
-		for corners: Array in FACES:
+		for face_index in FACES.size():
+			var corners: Array = FACES[face_index]
 			var face := PackedInt32Array()
 			for corner: int in corners:
 				face.append(ids[corner])
@@ -77,7 +78,8 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary]) -> Dictionary:
 			key.sort()
 			if not faces.has(key):
 				faces[key] = []
-			faces[key].append({"owner": index, "nodes": face})
+			faces[key].append({"owner": index, "nodes": face, "face_index": face_index})
+	var boundary: Array[Dictionary] = []
 	var areas := PackedFloat64Array()
 	areas.resize(nodes.size())
 	for entries: Array in faces.values():
@@ -105,6 +107,7 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary]) -> Dictionary:
 		normal = normal.normalized()
 		if normal.dot(center - bodies[owner].center) < 0:
 			normal = -normal
+		var touching := {}
 		for corner in 4:
 			# One probe per nodal dual-face patch, not one all-or-nothing face test.
 			var point: Vector3 = points[corner] * 0.5625 + points[(corner + 1) % 4] * 0.1875 + points[(corner + 3) % 4] * 0.1875 + points[(corner + 2) % 4] * 0.0625
@@ -113,13 +116,29 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary]) -> Dictionary:
 			for other in bodies.size():
 				if other != owner and _contains(bodies[other], point):
 					buried = true
-					break
+					if not include_boundary:
+						break
+					if not touching.has(ids[corner]):
+						touching[ids[corner]] = []
+					touching[ids[corner]].append(other)
 			if not buried:
 				areas[ids[corner]] += area / 4.0
+		if include_boundary:
+			var backing := {}
+			var face_index: int = entries[0].face_index
+			var cell_ids: PackedInt32Array = cells[owner].nodes
+			var perpendicular_bit := 4 >> (face_index / 2)
+			for corner: int in FACES[face_index]:
+				backing[cell_ids[corner]] = cell_ids[corner ^ perpendicular_bit]
+			boundary.append({"normal": normal, "area": area,
+				"owner": owner, "touching": touching, "backing": backing})
 	var exposed := PackedByteArray()
 	for area: float in areas:
 		exposed.append(int(area > 0))
-	return {"areas": areas, "exposed": exposed, "unresolved_cells": unresolved}
+	var result := {"areas": areas, "exposed": exposed, "unresolved_cells": unresolved}
+	if include_boundary:
+		result["boundary"] = boundary
+	return result
 
 
 func _contains(body: Dictionary, point: Vector3) -> bool:
