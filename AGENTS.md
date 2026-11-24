@@ -753,7 +753,7 @@ and the large benchmark excludes thermal/process work, startup and logging.
 The <1 ms production target remains unmet. M0 validation still depends on #13
 and the performance gate. The visual-first desktop development exception remains.
 
-## Melt separation in progress (#13)
+## Melt separation (#13)
 
 `src/sim/melt_separation.gd` stages rate-based migration during a molten
 interval. `advance(billet, equipment, dt)` uses local melt fraction, the
@@ -767,11 +767,11 @@ the discard ledger. `skim` releases the surface pool and `drain` releases
 the bottom pool, subtracting exactly that mass from the originating nodes and
 crediting the common discard ledger. Each call stages changes before committing.
 
-Issue #42 asks how an unremoved pool should behave across solidification and
-remelting. The continuous molten interval and both removal operations have
-headless coverage. Integration with cooling and subsequent forging awaits that
-decision. The M0 harness can exercise the already merged forging processes
-independently of this decision.
+The user decided in #42 that unskimmed pools reset at solidification.
+Thermal transport clears the staging metadata when the local melt fraction
+reaches zero. The remaining impurity and matter masses stay at their original
+points, so remelting requires a new separation interval. While a pool is
+staged, surface forging can only remove the unstaged fraction.
 
 The headless forging replay also runs a separate preheated refining charge.
 Its molten checkpoints verify the forge cap, migration without discard and

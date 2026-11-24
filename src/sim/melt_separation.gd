@@ -112,7 +112,10 @@ func _process(billet: RefCounted, equipment: Dictionary, dt: float, removal: Str
 		return _fail("Refining mass exceeds representable scale.")
 	for change in changes:
 		var node := nodes[change.node]
-		node["separated_impurities"] = change.separated
+		if change.separated.is_empty():
+			node.erase("separated_impurities")
+		else:
+			node["separated_impurities"] = change.separated
 		if not removal.is_empty():
 			node.impurity_mass.assign(change.impurities)
 			node.mass = change.mass

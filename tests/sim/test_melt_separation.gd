@@ -4,6 +4,7 @@ const Billet = preload("res://src/sim/granular_billet.gd")
 const Native = preload("res://src/sim/native_granular_billet.gd")
 const Library = preload("res://src/sim/material_library.gd")
 const Definition = preload("res://src/sim/material_definition.gd")
+const Thermal = preload("res://src/sim/thermal_model.gd")
 const Separation = preload("res://src/sim/melt_separation.gd")
 
 var failures := PackedStringArray()
@@ -26,6 +27,7 @@ func run() -> PackedStringArray:
 	_test_authored_materials(Billet)
 	_test_authored_materials(Native)
 	_test_two_destinations()
+	_test_cooling_reset()
 	return failures
 
 
@@ -97,6 +99,37 @@ func _test_two_destinations() -> void:
 	_expect(process.skim(billet, vessel), "Explicit surface skim succeeds independently")
 	_near(process.removed_mass, 2.0 * mass, "Skim releases the remaining float pool")
 	_near(billet.total_mass(), 2.0, "Both removal paths conserve accounted mass")
+
+
+func _test_cooling_reset() -> void:
+	var billet := Billet.new(materials, _data("mechanics"))
+	billet.add_node(Vector3.ZERO, 1.0, "prototype_mithril", 2200)
+	var node := billet.nodes[0]
+	var original: Dictionary = node.impurity_mass.duplicate()
+	var process := Separation.new()
+	var vessel: Dictionary = equipment.refining_crucible
+	_expect(process.advance(billet, vessel, 5.0) and process.moved_mass > 0.0, "Charge separates before cooling")
+	var thermal := Thermal.new(materials, _data("thermal"))
+	var area := PackedFloat64Array([1.0])
+	var water := {"temperature_c": 20.0, "coefficient_property": "quench_water", "coefficient_scale": 10.0}
+	for step in 30:
+		if node.temperature <= 2100.0:
+			break
+		_expect(thermal.step(billet.nodes, billet.connections, area, 0.03, water), "Quench succeeds")
+	_expect(node.temperature <= 2100.0 and not node.has("separated_impurities"),
+		"Solidification clears the staged impurity pools")
+	_expect(node.impurity_mass == original and billet.discarded_mass == 0.0,
+		"Solidification retains all unskimmed impurity mass")
+	var heat := {"temperature_c": 2200.0, "coefficient_property": "quench_air", "coefficient_scale": 5000.0}
+	for step in 12:
+		if node.temperature > 2100.0:
+			break
+		_expect(thermal.step(billet.nodes, billet.connections, area, 0.03, heat), "Reheat succeeds")
+	_expect(node.temperature > 2100.0 and process.skim(billet, vessel) and process.removed_mass == 0.0,
+		"Remelting leaves nothing immediately available for skimming")
+	_expect(process.advance(billet, vessel, 5.0) and process.moved_mass > 0.0
+		and process.skim(billet, vessel) and process.removed_mass > 0.0, "Remelted charge can separate again")
+	_near(billet.total_mass(), 1.0, "Refining across a thermal cycle conserves accounted mass")
 
 
 func _impurity(id: String, destination: String) -> Dictionary:
