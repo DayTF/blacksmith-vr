@@ -12,13 +12,14 @@ var _hammer := MeshInstance3D.new()
 var _purification_sites := MultiMeshInstance3D.new()
 var _camera := Camera3D.new()
 var _status := Label.new()
-var _pause := Button.new()
-var _presets := OptionButton.new()
+var _pause: Button
+var _presets: OptionButton
 var _environments: OptionButton
 var _faces: Array = []
 var _yaw := 0.65
 var _pitch := 0.55
 var _distance := 0.32
+var _stage_floor_y := -0.11
 var _capture_path := ""
 var _smoke := false
 var _before_strike := false
@@ -92,8 +93,9 @@ func _build_stage() -> void:
 	fill.omni_range = 0.6
 	add_child(fill)
 	_box(Vector3(0.14, 0.025, 0.22), Vector3(0, -0.0125, 0), Color("39434e"), 0.85)
-	_box(Vector3(0.075, 0.08, 0.12), Vector3(0, -0.065, 0), Color("252e38"), 0.8)
-	_box(Vector3(2, 0.01, 2), Vector3(0, -0.11, 0), Color("171e27"), 0.0)
+	var support_height := -0.03 - _stage_floor_y
+	_box(Vector3(0.075, support_height, 0.12), Vector3(0, -0.025 - support_height * 0.5, 0), Color("252e38"), 0.8)
+	_box(Vector3(2, 0.01, 2), Vector3(0, _stage_floor_y, 0), Color("171e27"), 0.0)
 	add_child(_surface)
 	add_child(_wire)
 	var metal := ShaderMaterial.new()
@@ -219,6 +221,8 @@ func _refresh() -> void:
 
 
 func _build_ui() -> void:
+	_pause = Button.new()
+	_presets = OptionButton.new()
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	var margin := MarginContainer.new()

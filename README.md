@@ -119,3 +119,20 @@ strike. The replay ends at the welding strike.
 
 ![Hot layered weld](docs/previews/layered-hot.png)
 ![Cold layered weld](docs/previews/layered-cold.png)
+
+## Try tracked hammering in SteamVR
+
+1. Run `python3 tools/prepare_preview.py --xr`.
+2. Start SteamVR with your headset connected and select SteamVR as the active
+   OpenXR runtime in SteamVR settings.
+3. Open `.build/xr-preview/project.godot` in Godot 4.7 Standard and press **F5**.
+4. Face the anvil in your play area. Raise the right controller or tracked
+   hand above the billet and swing down. The mirror window shows the tracking
+   source, hit count, simulation step time, and host FPS.
+
+The hot billet uses a 30-point reference solver fixture with a fixed anvil.
+The initial grip offset is in `data/preview/tracked_hammer.json`. The fixture
+uses an OpenXR hand joint when available and falls back to the right controller's
+grip pose. The fixture uses the runtime controller model when available and a simple grip
+proxy otherwise.
+Headset tracking, grip alignment and headset frame timing need a hardware pass.

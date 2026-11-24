@@ -802,3 +802,19 @@ The <1 ms production target remains open. The debug-compatible mutable-view
 path measured 170.453 ms. Raw timings and profiles are in
 `benchmarks/native-projection-checkpoint.json`. The user-approved development
 exception allows M1 exploration while the production performance gate is open.
+
+## Tracked hammer development fixture (#15)
+
+`python3 tools/prepare_preview.py --xr` stages `.build/xr-preview` with
+OpenXR enabled and a native-free 30-point reference fixture. The default
+desktop staging command retains its existing scene. The XR fixture uses a
+stationary anvil and adds no locomotion or button-triggered impacts.
+
+`src/vr/hammer_tracking.gd` adapts right-hand knuckle tracking or the grip
+pose and requests the runtime's controller model when operating in controller
+mode. `src/sim/tracked_hammer.gd` tests a downward tip sweep against the
+frontmost points under the face and uses tracked displacement per second in
+the existing hammer API. Tracking source changes, loss and sample gaps
+prevent stale movement from becoming a strike. The scene logs simulation
+time and engine host FPS during a run. Hand/controller alignment and
+measured headset performance are pending hardware verification.

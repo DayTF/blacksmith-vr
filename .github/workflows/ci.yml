@@ -102,3 +102,13 @@ jobs:
             echo 'Godot reported desktop preview errors.' >&2
             exit 1
           fi
+
+      - name: Verify the tracked hammer fixture without XR hardware
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/prepare_preview.py --xr
+          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/tracked-preview.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/tracked-preview.log"; then
+            exit 1
+          fi
