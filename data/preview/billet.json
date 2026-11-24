@@ -1,0 +1,18 @@
+{
+  "description": "Small desktop mechanics inspection fixture, not calibrated gameplay or the performance benchmark.",
+  "dimensions": [3, 3, 9],
+  "spacing_m": 0.015,
+  "origin_m": [-0.015, 0, -0.06],
+  "material_id": "prototype_mithril",
+  "temperature_presets_c": [1000, 20],
+  "step_s": 0.011111111111111112,
+  "strike_interval_s": 0.8,
+  "strike_count": 6,
+  "settle_s": 0.8,
+  "hammer_mass_kg": 0.5,
+  "hammer_radius_m": 0.023,
+  "hammer_velocity_m_s": [0, -0.025, 0],
+  "strike_z_m": [-0.03, 0, 0.03],
+  "hammer_lift_m": 0.06,
+  "emission_scale": 0.7
+}

@@ -144,7 +144,7 @@ their implementation; do not invent them in scripts.
 
 - **M0 (#1)**: standalone headless synthetic forging prototype, position logs,
   purification, layered material behavior and performance measurements.
-  **Hard prerequisite:** validate M0 before scene/VR integration.
+  The user now authorizes an early visual preview before complete M0 validation (see development order below).
 - **M1 (#2)**: temperature-colored live mesh and tracked hammer input.
 - **M2 (#3)**: approximately 4 m × 6 m room: forge at back, anvil central, quench
   tank to side, wall tool rack, player start at front; about 5–10 active lights.
@@ -322,8 +322,9 @@ var events = material.phase_events(1300.0, 1500.0)
 
 The material and granular mechanics layers have correctness tests. M0 remains
 open: thermal transport (#10), surface purification (#11), folding/welding (#12),
-melt separation (#13), and the complete forging harness (#14) remain. No playable
-scene or XR performance result exists. Do not start M1 until M0 is validated.
+melt separation (#13), and the complete forging harness (#14) remain. The early
+desktop inspection scene (#35) is an authorized development-order exception;
+tracked VR input and XR performance have not been validated.
 
 ## M0 granular mechanics reference (issue #9)
 
@@ -395,7 +396,9 @@ The user approved a native C++ GDExtension hot loop and build tooling in #31;
 implementation is #32. The GDScript solver stays as the correctness reference.
 Native optimization within the existing material/physics contract is authorized;
 do not ask for that permission again. No change in resolution, fidelity or the
-performance target is approved. Keep M0/M1 gated until the budget is validated.
+production performance target is approved. The user later authorized smaller
+development previews and lower development frame rates (#35); optimization #33
+is deferred behind visual feedback. Preserve the original benchmark for comparisons.
 
 
 ## Native mechanics API and build (issue #32)
@@ -489,9 +492,52 @@ spring and volume projections. Invariant arithmetic is cached, volume algebra
 is simplified and fixed-state material queries are cached; no iteration or grid
 reduction was used to obtain the reported speedup.
 
-The **<1 ms** sim gate remains unmet, and even the native mechanics step alone
-exceeds the full 90 Hz frame budget. Continue native hot-loop profiling/optimization in **#33**
-before claiming performance readiness. Do not close M0, start M1, or suggest a
-playtest based on these headless results. Remaining thermal/process/harness work
-is still #10–#14. Preserve physical invariants and native/reference agreement
-while optimizing; this checkpoint does not authorize silently reducing fidelity.
+The **<1 ms** sim target remains unmet, and even the native mechanics step alone
+exceeds the full 90 Hz frame budget. These measurements do not establish XR
+readiness. The latest user decision supersedes the previous development gate:
+prioritize a visible small-grid preview (#35), defer optimization (#33), and allow
+lower development frame rates. Keep the full benchmark unchanged and report the
+preview resolution separately. Remaining thermal/process/harness work is still
+#10–#14; M0 stays open until those criteria are satisfied.
+
+## Development order: visual feedback first (user decision)
+
+The user explicitly requested a visual render of the earliest working state before
+more optimization or complete M0 validation. This supersedes the original strict
+M0-before-M1 order **for development previews**. Production targets remain 90 Hz
+and <1 ms simulation; neither blocks building or trying an early desktop scene.
+Do not spend the next session optimizing #33 before showing usable visual feedback.
+
+#35 adds a small-grid, desktop-only scripted inspection scene. It is a preview of
+existing mechanics, not a completed forging game or VR build. Scripted hammer
+impacts are the already approved synthetic prototype input; replay/pause controls
+are inspection tools, not button-driven player forging. Constant prescribed hot/
+cold temperatures are fixture state, not heating, cooling or quenching. Keep these
+limits visible. Next expand visible thermal behavior (#10), then local surface
+purification (#11), and retain tracked controller integration in #15. Folding,
+welding and the full crafting lifecycle remain outstanding. Suggest trying the
+visual preview when available, accurately describing its limited interaction.
+
+
+### Early visual preview API (#35)
+
+`scenes/billet_preview.tscn` is the root project's main scene. Its thin renderer
+(`src/game/billet_preview.gd`) calls `PreviewSession.advance(delta)` and updates
+meshes/UI. The engine-light reference solver is unchanged. The session is a
+RefCounted synthetic harness in `src/game/preview_session.gd`, with `initialize`,
+`reset(prescribed_temperature)`, `advance(delta)` and `summary()`. It reads fixture
+setup from `data/preview/billet.json`, uses the existing mechanics tuning unchanged,
+and applies the existing hammer impulse API. It is not player input or thermal
+transport. The current fixture has 81 points and cannot establish benchmark speed.
+
+`python3 tools/prepare_preview.py` stages an allow-listed GDScript-only project
+under `.build/preview` so Windows users can launch the small reference fixture
+without native compilation. No native extension manifest is copied. This does
+not remove native requirements from root-project validation or production work.
+Re-run staging after edits. See README.md for controls and capture/smoke commands.
+Surface quads follow boundary nodes; red links show fracture, but the rendered
+surface does not split yet. The hot fixture also deforms during gravitational
+settling: report the existing model's behavior honestly rather than promising
+calibrated forging feel. Windows Forward+ rendering uses the RTX 3080 Ti; XR has
+not been tested. The old WSL software Vulkan stack crashed during rendering, so
+headless Linux checks and actual Windows rendering are reported separately.
