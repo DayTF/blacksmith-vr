@@ -73,6 +73,19 @@ jobs:
             exit 1
           fi
 
+      - name: Run the headless M0 forging replay
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script tests/forging_harness.gd > "$RUNNER_TEMP/forging-replay.log" 2>&1 || {
+            cat "$RUNNER_TEMP/forging-replay.log"
+            exit 1
+          }
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/forging-replay.log"; then
+            cat "$RUNNER_TEMP/forging-replay.log"
+            exit 1
+          fi
+
       - name: Run staged desktop preview
         shell: bash
         run: |
