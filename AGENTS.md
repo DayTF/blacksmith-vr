@@ -845,7 +845,7 @@ restoration across a crack. Below-ground corrections remain constrained by
 the anvil.
 
 The SteamVR fixture uses a provisional multiplier of 1.25, targeting a minimum
-80% reference volume per tetrahedron with 1% solver residual tolerance. A step
-that cannot satisfy the bound within the iteration budget keeps its previous
+80% reference volume per tetrahedron with 1% solver residual tolerance. The final substep can use one extra density/anvil-only pass budget for
+strong impacts. A step that cannot satisfy the bound within that budget keeps its previous
 committed state and reports nonconvergence. This is a geometry constraint,
 not a change to the material density curve or the refining mass accounting.

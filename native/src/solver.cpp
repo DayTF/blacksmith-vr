@@ -298,6 +298,12 @@ bool Solver::step(double dt) {
             project_anvil(projection_points, parameters.anvil, h, anvil_support);
             record(5, phase_start);
         }
+        if (parameters.maximum_density_multiplier > 0 && substep == parameters.substeps - 1) {
+            for (int pass = 0; pass < parameters.iterations && !compression_resolved(); ++pass) {
+                limit_compression(inverse_h);
+                project_anvil(projection_points, parameters.anvil, h, anvil_support);
+            }
+        }
         phase_start = now();
         for (size_t i = 0; i < work.nodes.size(); ++i) {
             work.nodes[i].position = projection_points[i].position;
@@ -482,11 +488,11 @@ bool Solver::compression_resolved() const {
     const auto &ring = compression_ring;
     for (const auto &cell : work.cells) {
         const double minimum_six_volume = 0.99 * cell.rest / parameters.maximum_density_multiplier;
-        const V root = work.nodes[cell.nodes[0]].position;
-        const V diagonal = work.nodes[cell.nodes[7]].position - root;
+        const V root = projection_points[cell.nodes[0]].position;
+        const V diagonal = projection_points[cell.nodes[7]].position - root;
         for (size_t i = 0; i < ring.size(); ++i) {
-            const V a = work.nodes[cell.nodes[ring[i]]].position - root;
-            const V b = work.nodes[cell.nodes[ring[(i + 1) % ring.size()]]].position - root;
+            const V a = projection_points[cell.nodes[ring[i]]].position - root;
+            const V b = projection_points[cell.nodes[ring[(i + 1) % ring.size()]]].position - root;
             if (a.dot(b.cross(diagonal)) < minimum_six_volume)
                 return false;
         }

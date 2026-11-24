@@ -214,6 +214,13 @@ func step(dt: float) -> bool:
 			if density_limit > 0.0:
 				_solve_compression_limit(positions, velocities, h, density_limit)
 			_project_anvil(positions, velocities, h, support)
+		# Resolve remaining density/anvil coupling without changing normal spring iteration counts.
+		if density_limit > 0.0 and substep == int(tuning.substeps) - 1:
+			for correction_pass in int(tuning.iterations):
+				if _compression_resolved(positions, density_limit):
+					break
+				_solve_compression_limit(positions, velocities, h, density_limit)
+				_project_anvil(positions, velocities, h, support)
 		_damp(positions, velocities, broken, h)
 		for index in nodes.size():
 			if positions[index].y <= tuning.anvil_height_m and velocities[index].y < 0.0:

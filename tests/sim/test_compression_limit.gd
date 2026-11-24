@@ -29,8 +29,8 @@ func run() -> PackedStringArray:
 				top = maxf(top, node.position.y)
 			var x := 0.005 if hit % 2 else -0.005
 			sweep.reset_tracking()
-			sweep.apply(billet, Vector3(x, top + 0.01, -0.03), 0.01, 0.023, 0.5, 0.1, 0.25)
-			if not sweep.apply(billet, Vector3(x, top - 0.01, -0.03), 0.01, 0.023, 0.5, 0.1, 0.25):
+			sweep.apply(billet, Vector3(x, top + 0.02, -0.03), 0.01, 0.023, 0.5, 0.1, 0.25)
+			if not sweep.apply(billet, Vector3(x, top - 0.02, -0.03), 0.01, 0.023, 0.5, 0.1, 0.25):
 				failures.append("Repeated-strike fixture missed at hit %d." % (hit + 1))
 				failed = true
 				break
