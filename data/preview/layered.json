@@ -1,0 +1,15 @@
+{
+  "spacing_m": 0.023,
+  "cross_section_points": 2,
+  "length_points": 5,
+  "base_material": "prototype_mithril",
+  "leaf_material": "prototype_embersteel",
+  "hot_temperatures_c": [1450, 1200],
+  "cold_temperature_c": 20,
+  "start_hold_s": 0.65,
+  "fold_duration_s": 1.45,
+  "strike_delay_s": 0.65,
+  "finish_hold_s": 0.5,
+  "emission_scale": 0.09,
+  "weld_marker_color": [0.13, 1.0, 0.63, 1.0]
+}

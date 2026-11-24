@@ -2,7 +2,10 @@ extends Node3D
 ## Desktop inspection only. Player forging will use tracked XR motion (#15).
 
 const Session = preload("res://src/game/preview_session.gd")
-var session := Session.new()
+const LayeredSession = preload("res://src/game/layered_preview_session.gd")
+
+@export var layered_replay := false
+var session: RefCounted = Session.new()
 var _surface := MeshInstance3D.new()
 var _wire := MeshInstance3D.new()
 var _hammer := MeshInstance3D.new()
@@ -11,7 +14,7 @@ var _camera := Camera3D.new()
 var _status := Label.new()
 var _pause := Button.new()
 var _presets := OptionButton.new()
-var _environments := OptionButton.new()
+var _environments: OptionButton
 var _faces: Array = []
 var _yaw := 0.65
 var _pitch := 0.55
@@ -36,6 +39,8 @@ func _ready() -> void:
 		_verify_purification = _verify_purification or argument == "--preview-purification"
 	if _smoke or not _capture_path.is_empty():
 		get_viewport().set_disable_input(true)
+	if layered_replay:
+		session = LayeredSession.new()
 	if not session.initialize():
 		_fail()
 		return
@@ -175,7 +180,11 @@ func _refresh() -> void:
 				var emission: float = session.materials.sample(node.material_id, "emission_energy", {"temperature": node.temperature}) * session.config.emission_scale
 				triangles.set_uv2(Vector2(emission, 0))
 				triangles.set_normal(normal)
-				triangles.set_color(Color(rgb[0], rgb[1], rgb[2]))
+				var color := Color(rgb[0], rgb[1], rgb[2])
+				if layered_replay:
+					var tint := Color("94baff") if node.layer_id == "leaf" else Color("ffc473")
+					color = color.lerp(tint, 0.6)
+				triangles.set_color(color)
 				triangles.add_vertex(node.position)
 	_surface.mesh = triangles.commit()
 	var lines := SurfaceTool.new()
@@ -187,10 +196,16 @@ func _refresh() -> void:
 	_wire.mesh = lines.commit()
 	var marker_count := 0
 	for index in nodes.size():
-		if session.purified_nodes[index] != 0:
+		var marked: bool = session.weld_marker_nodes.has(index) if layered_replay else session.purified_nodes[index] != 0
+		if marked:
 			_purification_sites.multimesh.set_instance_transform(marker_count, Transform3D(Basis.IDENTITY, nodes[index].position))
 			marker_count += 1
 	_purification_sites.multimesh.visible_instance_count = marker_count
+	if layered_replay:
+		_hammer.position = session.contact + Vector3.UP * session.hammer_height()
+		_status.text = "%s\n\n%d contacts under the hammer\n%d bonded patches\n\nGold · Mithril base\nBlue · Embersteel leaf\nMint · Bonded patch" % [
+			"Paused" if session.paused else session.stage, session.contacting_patches, session.bonded_patches]
+		return
 	var phase: float = fmod(session.elapsed, session.config.strike_interval_s) / session.config.strike_interval_s
 	_hammer.position = session.contact + Vector3.UP * (0.01 + session.config.hammer_lift_m * sin(phase * PI))
 	if session.finished or session.thermal_inspection:
@@ -214,21 +229,24 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 14)
 	margin.add_child(column)
 	var title := Label.new()
-	title.text = "BLACKSMITH / BILLET STUDY"
+	title.text = "BLACKSMITH / LAYERED WELD" if layered_replay else "BLACKSMITH / BILLET STUDY"
 	title.add_theme_font_size_override("font_size", 26)
 	column.add_child(title)
 	var subtitle := Label.new()
-	subtitle.text = "EARLY MECHANICS PREVIEW · DESKTOP"
+	subtitle.text = "SCRIPTED FORGE WELD COMPARISON" if layered_replay else "EARLY MECHANICS PREVIEW · DESKTOP"
 	subtitle.modulate = Color("a6b8ca")
 	column.add_child(subtitle)
 	column.add_child(_status)
 	for value: float in session.config.temperature_presets_c:
-		_presets.add_item("%.0f °C · %s" % [value, "hot" if value > 20 else "cold"])
+		if layered_replay:
+			_presets.add_item("Hot weld" if value > 20 else "Cold comparison")
+		else:
+			_presets.add_item("%.0f °C · %s" % [value, "hot" if value > 20 else "cold"])
 	_presets.select(1 if session.temperature == session.config.temperature_presets_c[1] else 0)
 	_presets.item_selected.connect(func(index: int): _restart(float(session.config.temperature_presets_c[index])))
 	column.add_child(_presets)
 	var replay := Button.new()
-	replay.text = "Replay synthetic strikes"
+	replay.text = "Replay fold and strike" if layered_replay else "Replay synthetic strikes"
 	replay.pressed.connect(func(): _restart(session.temperature))
 	column.add_child(replay)
 	_pause.text = "Pause"
@@ -237,6 +255,18 @@ func _build_ui() -> void:
 		_pause.text = "Resume" if session.paused else "Pause"
 		_refresh())
 	column.add_child(_pause)
+	var switch_preview := Button.new()
+	switch_preview.text = "Back to billet study" if layered_replay else "Open layered weld replay"
+	switch_preview.pressed.connect(func():
+		var destination := "billet_preview" if layered_replay else "layered_preview"
+		get_tree().change_scene_to_file("res://scenes/%s.tscn" % destination))
+	column.add_child(switch_preview)
+	if layered_replay:
+		var controls := Label.new()
+		controls.text = "Right-drag to orbit · Wheel to zoom"
+		column.add_child(controls)
+		return
+	_environments = OptionButton.new()
 	_environments.add_item("Synthetic strikes · keep billet")
 	_environments.allow_reselect = true
 	for environment: Dictionary in session.environments.environments:
@@ -257,7 +287,7 @@ func _build_ui() -> void:
 	sites.toggled.connect(func(visible_sites: bool): _purification_sites.visible = visible_sites)
 	column.add_child(sites)
 	var note := Label.new()
-	note.text = "Right-drag: orbit · Wheel: zoom\n\nMode menu keeps the billet; Replay resets.\nFantasy tuning · No folding or VR input.\nRed: failure · Cyan: impurity release sites\nSurface mesh does not split at cracks yet."
+	note.text = "Right-drag: orbit · Wheel: zoom\n\nMode menu keeps the billet; Replay resets.\nFantasy tuning · Scripted desktop controls.\nRed: failure · Cyan: impurity release sites\nSurface mesh does not split at cracks yet."
 	note.add_theme_font_size_override("font_size", 14)
 	note.modulate = Color("a6b8ca")
 	column.add_child(note)
@@ -268,7 +298,8 @@ func _restart(temperature: float) -> void:
 		_fail()
 		return
 	_pause.text = "Pause"
-	_environments.select(0)
+	if _environments != null:
+		_environments.select(0)
 	_refresh()
 
 
@@ -303,6 +334,13 @@ func _finish_capture() -> void:
 	# Close a popup if a desktop click arrived while the automated capture ran.
 	_presets.get_popup().hide()
 	var result: Dictionary = session.summary()
+	if layered_replay:
+		var hot: bool = session.temperature == session.config.temperature_presets_c[0]
+		if session.contacting_patches == 0 or (session.bonded_patches > 0) != hot:
+			session.errors.append("Layered replay failed to distinguish the hot and cold interfaces.")
+			_fail()
+			return
+		print("Layered replay complete: %d contacting, %d bonded" % [session.contacting_patches, session.bonded_patches])
 	if _before_strike and (session.strikes != 0 or result.broken != 0 or result.strain != 0):
 		session.errors.append("Unstruck billet must have no damage or plastic strain.")
 		_fail()
@@ -321,7 +359,7 @@ func _finish_capture() -> void:
 			session.errors.append("Thermal preview failed to respond within equipment limits.")
 			_fail()
 			return
-	if not _thermal_capture and not _before_strike and result.strain <= 0.0 and result.broken == 0:
+	if not layered_replay and not _thermal_capture and not _before_strike and result.strain <= 0.0 and result.broken == 0:
 		session.errors.append("Demo produced neither plastic deformation nor fracture.")
 		_fail()
 		return

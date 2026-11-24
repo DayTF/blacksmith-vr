@@ -750,8 +750,8 @@ is 15.102 ms median over five samples after two warmup steps at 5,000 nodes,
 14,050 connections and 4,104 volume cells. See
 `benchmarks/forging-harness-mechanics.json`. The replay is deliberately small,
 and the large benchmark excludes thermal/process work, startup and logging.
-The <1 ms production target remains unmet. M0 validation still depends on #13
-and the performance gate. The visual-first desktop development exception remains.
+The <1 ms production target remains unmet. The melt and forging replays are implemented. M0 validation still depends on
+the performance gate. The visual-first desktop development exception remains.
 
 ## Melt separation (#13)
 
@@ -776,3 +776,13 @@ staged, surface forging can only remove the unstaged fraction.
 The headless forging replay also runs a separate preheated refining charge.
 Its molten checkpoints verify the forge cap, migration without discard and
 explicit skimming with conserved accounted mass.
+
+
+## Layered desktop inspection (#45)
+
+The billet study opens a separate scripted fold-and-weld replay. The two
+temperature presets use the same geometry and strike. The leaf moves through
+the sim's fold API and the hammer calls its contact-gated welding API. The
+display counts contact attempts and draws markers at successful bond patches.
+This inspection uses 40 points and ends at the weld strike. CI checks the hot
+and cold outcomes. Windows Forward+ captures are in `docs/previews/`.
