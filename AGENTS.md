@@ -220,6 +220,7 @@ Run with Godot Standard 4.7+ (`godot` below means your installed binary):
 cmake -S native -B .build/native -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build .build/native --parallel 2
 ctest --test-dir .build/native --output-on-failure
+python3 tools/prepare_native_import.py
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script tests/check_scripts.gd
 godot --headless --path . --script tests/run_all.gd
@@ -446,6 +447,15 @@ with `-DBLACKSMITH_BUILD_EXTENSION=OFF` and run its CTest suite.
 Build **before** importing/running the project; the manifest expects a native
 library. Linux x86_64 is tested. Windows paths/build output are configured but
 Windows native compilation and XR hardware have not been validated yet.
+
+Before a fresh headless editor import, run `tools/prepare_native_import.py` after
+building. It preserves existing entries and lists our built extension in the
+generated `.godot/extension_list.cfg`, so classes load at startup. This contains
+Godot's deferred extension-documentation shutdown race (upstream
+[issue #111048](https://github.com/godotengine/godot/issues/111048) and
+[fix #123658](https://github.com/godotengine/godot/pull/123658)). Plain cold CI
+import aborted in engine frames even under gdb; this preparation retains the
+normal import, full script compilation and mandatory simulation/error checks.
 
 The current WSL user cannot install system packages without a sudo password.
 An isolated GCC 9.4/sysroot and CMake 3.27.9 were extracted under
