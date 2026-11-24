@@ -72,3 +72,15 @@ jobs:
             echo 'Godot reported errors while running simulation suites.' >&2
             exit 1
           fi
+
+      - name: Run staged desktop preview
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/prepare_preview.py
+          godot --headless --path .build/preview -- --preview-smoke 2>&1 | tee "$RUNNER_TEMP/preview.log"
+          godot --headless --path .build/preview -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/preview.log"; then
+            echo 'Godot reported desktop preview errors.' >&2
+            exit 1
+          fi
