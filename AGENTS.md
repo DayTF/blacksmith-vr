@@ -312,26 +312,78 @@ var events = material.phase_events(1300.0, 1500.0)
   separable impurity and one bound impurity; the contrasting alloy disables melt
   purification. These files do not establish real-world metallurgy.
 
-The material layer has correctness tests, but there is no live billet, thermal
-solver, forging harness, performance result or playable scene yet. Next: granular
-mechanics **#9**, followed by thermal transport **#10** and surface purification
-**#11**. M0 remains open until the complete prototype is validated.
+The material and granular mechanics layers have correctness tests. M0 remains
+open: thermal transport (#10), surface purification (#11), folding/welding (#12),
+melt separation (#13), and the complete forging harness (#14) remain. No playable
+scene or XR performance result exists. Do not start M1 until M0 is validated.
 
-## M0 granular mechanics prototype (issue #9, in progress)
+## M0 granular mechanics reference (issue #9)
 
-`src/sim/granular_billet.gd` exposes a manually constructed spring network. Pass a
-loaded material library and a tuning dictionary to `new()`, add material points
-with `add_node()` and links with `connect_nodes()`, and call `step(dt)` in SI units
-(temperatures in Celsius). `hammer(center, outward_normal, radius, mass, velocity)`
-transfers momentum to the foremost covered nodes within the configured face depth.
-`data/sim/mechanics.json` contains provisional tuning; callers load it and choose
-node/link geometry, mass and integration timestep. The solver uses semi-implicit
-Euler, axial springs and a flat, frictionless, inelastic anvil. It samples each
-endpoint's material curves, using the weaker endpoint for modulus, yield and
-failure strain. Link `rest_length`, `stiffness`, `damping` and `broken`, and each
-node's local state, are exposed for subsequent M0 work. No material is discarded
-by mechanics; `total_mass()` includes the discard ledger.
+`src/sim/granular_billet.gd` is a RefCounted reference solver. Construct with a
+loaded material library and the JSON tuning from `data/sim/mechanics.json`.
+`build_grid(dimensions: Vector3i, spacing_m, origin: Vector3, material_id,
+temperature_c, layer_id="")` transactionally constructs an empty billet's regular
+lattice. `add_node()` and `connect_nodes()` support manually assembled networks.
 
-This is an unfinished prototype: grid construction, realistic plastic spreading,
-robust integration and realistic-scale performance have not been validated. Do not
-consider issue #9 or M0 complete based on the current unit tests alone.
+- Use SI units and Celsius. Nodes carry position/velocity/mass, temperature,
+  material identity, pure-constituent composition, layer id/orientation, local
+  impurity masses, accumulated work-hardening strain and current-step increments.
+  Different materials occupy different lattice points; this solver does not
+  invent a homogenization law for fractional mixtures within one point.
+- `add_node(..., impurity_mass=null)` initializes impurities from the material's
+  base concentrations. Explicit impurity dictionaries support processed matter.
+  Grid masses use density and boundary dual volumes; they sum to density times
+  the geometric billet volume. Axial boundary link areas use matching dual areas.
+- Integration uses [XPBD compliance](https://mmacklin.com/xpbd.pdf) for axial
+  springs, a flat frictionless inelastic anvil, and hexahedral cell volume
+  constraints. Bulk response comes from `bulk_modulus(T)` in the material defaults
+  (provisional fantasy tuning). This permits lateral plastic spreading while
+  approximately preserving local volume. Cells use six tetrahedra for signed
+  volume/analytic gradients and deactivate if any structural edge breaks.
+- Links expose rest/initial length, area, stiffness, damping, fracture damage and
+  broken state. Young's modulus/yield/ductility use the weaker endpoint's curves;
+  bulk response uses the weakest cell constituent. These are prototype assembly
+  choices, not claims of calibrated metallurgy. Return mapping changes rest
+  length above yield. Node strain increments average incident link contributions
+  by reference volume; `plastic_spreading_increment` counts permanent extension.
+- The approved #27 fracture model applies to both compression and tension and
+  commits damage separately from recoverable work-hardening strain. Fracturing
+  trial increments do not change rest length or apply work hardening.
+- Layer orientation follows the deformed grid's local frame. Degenerate or
+  cracked frames retain their previous valid orientation. Manual networks without
+  cells preserve their explicit input orientation until a caller transforms it.
+- `hammer(center, outward_normal, radius, hammer_mass, velocity)` contacts the
+  foremost covered nodes. An inelastic effective mass accounts for the continuing
+  hammer; distributing impulse by contacted mass avoids launching a tiny grain
+  with the entire hammer momentum. `last_impulse` records delivered momentum.
+  Impact transfer, face depth/tolerance and numerical tuning live in JSON.
+- `step(dt)` uses data-defined substeps/iterations and timestep bounds. Candidate
+  arrays retain the prior mechanical state if validation fails. The solver
+  samples temperature/accumulated-strain graphs; extra pressure/rate-dependent
+  mechanics inputs are not currently computed. Curves requiring missing inputs
+  fail explicitly rather than substituting values.
+- Analytic constraint corrections update velocity without subtracting nearly
+  identical float positions. Pairwise damping is implicit and conserves internal
+  momentum. Anvil impulses are external. Mechanical deformation preserves
+  material/impurity mass; `total_mass()` includes `discarded_mass` for subsequent
+  purification accounting. Mechanics itself does not discard or purify matter.
+
+Correctness coverage includes elastic recovery, permanent yielding, compression
+and tension damage, reheating not healing damage, real-material-scale stability,
+impurity initialization, layer rotation, bounded contact impulses, anvil contact,
+volume gradients, flattening/spreading, mass/momentum and rejected-step atomicity.
+
+### Performance gate: not met
+
+Run `godot --headless --path . --script tests/benchmark_mechanics.gd` for the
+opt-in mechanics benchmark; fixture parameters are in mechanics.json. Timings
+exclude startup, grid construction and output. `benchmarks/mechanics-baseline.json`
+records the initial reference result: 5,000 nodes, 14,050 links, 4,104 volume cells,
+4 substeps × 8 iterations, five samples after two warmup steps, on WSL with a
+Ryzen 9 5900X. Median step time was **2,525.593 ms**, versus **<1 ms** required.
+This is a severe miss, not a 90 Hz-ready solver. The benchmark is not an XR test.
+
+The GDScript implementation is a correctness reference, not an approved runtime
+performance solution. Native acceleration, a different solver/resolution, or
+relaxing the budget needs a user decision under the original risk/portability
+rules. Keep M0 and M1 gated; do not silently reduce node count or change language.

@@ -1,0 +1,38 @@
+{
+  "description": "Provisional M0 XPBD lattice tuning; SI units, not calibrated forging feel.",
+  "spring_area_m2": 0.0001,
+  "damping_ns_per_m": 0.1,
+  "anvil_height_m": 0.0,
+  "hammer_impulse_transfer": 1.0,
+  "hammer_contact_depth_m": 0.01,
+  "contact_tolerance_m": 1e-06,
+  "minimum_length_m": 1e-08,
+  "minimum_step_s": 1e-06,
+  "maximum_step_s": 0.03333333333333333,
+  "substeps": 4,
+  "iterations": 8,
+  "gravity_m_s2": [
+	0,
+	-9.81,
+	0
+  ],
+  "benchmark": {
+	"dimensions": [
+	  20,
+	  10,
+	  25
+	],
+	"spacing_m": 0.005,
+	"origin_m": [
+	  0,
+	  0.1,
+	  0
+	],
+	"material_id": "prototype_mithril",
+	"temperature_c": 1000,
+	"compression_ratio": 0.99,
+	"dt_s": 0.011111111111111112,
+	"warmup_steps": 2,
+	"samples": 5
+  }
+}

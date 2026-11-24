@@ -1,0 +1,29 @@
+{
+  "connections": 14050,
+  "iterations": 8.0,
+  "median_ms": 2525.593,
+  "nodes": 5000,
+  "samples_ms": [
+    2484.272,
+    2559.647,
+    2564.003,
+    2511.633,
+    2525.593
+  ],
+  "substeps": 4.0,
+  "target_ms": 1.0,
+  "volume_cells": 4104,
+  "warmup_steps": 2.0,
+  "engine": "4.7.2.stable.official.ed1daf0bf Standard Linux x86_64",
+  "scope": "Warmed GDScript mechanics step only; startup/grid construction/logging excluded; not an XR frame measurement",
+  "dt_s": 0.011111111111111112,
+  "material_id": "prototype_mithril",
+  "temperature_c": 1000,
+  "compression_ratio": 0.99,
+  "budget_met": false,
+  "reproduce": "godot --headless --path . --script tests/benchmark_mechanics.gd",
+  "cpu": "AMD Ryzen 9 5900X 12-Core Processor; Microsoft virtualization/WSL",
+  "active_cells": 4104,
+  "broken_links": 0,
+  "finite_state": true
+}
