@@ -71,8 +71,8 @@ The preview has been rendered on Windows / RTX 3080 Ti / Vulkan Forward+ and run
 headlessly on Linux/WSL. No XR headset or tracked input is validated yet.
 
 Work is tracked in [GitHub issues](https://github.com/DayTF/blacksmith-vr/issues).
-The next priorities are melt separation (#13), the forging harness (#14), and
-tracked input (#15). Optimization (#33) remains deferred.
+The scripted M0 processes and forging replay are implemented. The production
+performance gate and tracked input (#15) remain open.
 
 Thermal inspection currently uses reference grid surface areas and assumes the
 whole boundary sees the selected environment. It does not model anvil heat
@@ -85,7 +85,7 @@ work-hardening recovery now implemented.
 
 Current geometric surface queries account for buried/contacting layers, even
 before welding. The headless simulation supports scripted stacking, folding, and
-hammer-driven welds (#12). The desktop preview has no folding control. Failed/inverted cells are conservatively ineligible for
+hammer-driven welds (#12). Open the layered weld replay from the desktop study to inspect the fold. Failed/inverted cells are conservatively ineligible for
 purification, not treated as holes. Fully exhausting an all-impurity granule is
 rejected atomically; zero-mass topology deletion is not implemented.
 
@@ -103,3 +103,19 @@ folding, welding, spreading with surface purification, and quenching. Each
 checkpoint records local positions, temperatures and impurity masses.
 The separate 5,000-node mechanics benchmark measured 15.102 ms per warmed
 step against the 1 ms budget. [Benchmark samples](benchmarks/forging-harness-mechanics.json)
+
+
+## Try the layered weld replay
+
+Run `python3 tools/prepare_preview.py`, open `.build/preview/project.godot`
+in Godot 4.7 Standard, and press **F5**. Select **Open layered weld replay**.
+Watch the hot pass, then choose **Cold comparison**. The same two patches
+contact under the hammer. The hot strike creates two mint-marked bonds and the
+cold strike leaves both contacts unbonded. Right-drag to orbit and scroll to zoom.
+
+The replay uses 40 simulation points with two fantasy materials. Color tints
+identify the layers and the scripted hammer lets both cases use the same
+strike. The replay ends at the welding strike.
+
+![Hot layered weld](docs/previews/layered-hot.png)
+![Cold layered weld](docs/previews/layered-cold.png)

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/billet_preview.tscn" id="1"]
+
+[node name="LayeredPreview" instance=ExtResource("1")]
+layered_replay = true
