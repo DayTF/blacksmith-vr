@@ -698,3 +698,38 @@ thermal/unstruck captures require zero removal. All six sim suites cover localit
 fold burial/re-exposure, elastic/compression exclusions, fractional removal,
 process eligibility, atomic failures, native ownership and retained-billet cycles.
 Next is #12; no VR manipulation, welding, final item stats or inventory is claimed.
+
+## Scripted layered forging (#12)
+
+Construct `src/sim/layered_forging.gd` with the dictionaries from
+`data/sim/surface.json` and `data/sim/welding.json`. It accepts the reference and
+native billet adapters. The native adapter uses its mutable topology views for
+these operations. Call its existing `commit_state()` to return to resident mode.
+
+- `stack_grid(billet, dimensions, spacing, origin, material_id, temperature,
+  layer_id)` appends an independently indexed grid and returns its node indices.
+  Pair and cell indices are rebased. The caller supplies placement and layer IDs.
+- `fold(billet, indices, pivot, axis, angle)` scripts a rotation of selected points.
+  It rotates the local velocity and layer frame, preserves impurity inventories
+  and historical state, and rejects unresolved cell geometry before committing.
+  Separated leaves support scripted half-turns; a connected hinge can bend while
+  its existing cells stay valid. The script supplies the path and placement.
+  There is no automatic hinge remeshing or inter-layer collision response.
+- `hammer(billet, center, normal, radius, mass, velocity, pairs)` takes scripted
+  interface node pairs. It checks coincident patches, mutual burial, opposing
+  normals, strike footprint and a delivered impulse. The lower of the two
+  local `weldability` ratios scales effective bond area and damping. A material
+  can veto welding with `processes.welding.enabled: false`. A zero ratio records
+  a failed weld with no spring, while intermediate values create weaker bonds.
+  The bond uses backing corners of the contacting cells for a finite spring
+  span at zero gap. It conducts through its effective area and uses the existing
+  mechanical fracture model. Repeat hits preserve existing bonds and fractures.
+  `weld_attempts` describes the latest call.
+- `BilletSurface.evaluate(nodes, cells, true)` also reports boundary patch
+  geometry, neighboring occluding cells and backing points for interface queries.
+  Ordinary exposure continues to work with either welded or unbonded layers.
+
+Tests cover single-material folds, mixed-material stacks, burial/re-exposure,
+cold failures, weaker and full bonds, strike gating and conservation through
+native/reference mechanics steps. The scripted API is for M0 and the future
+forging harness. The desktop preview and XR input are unaffected. Next is #13.

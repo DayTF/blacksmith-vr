@@ -1,0 +1,4 @@
+{
+  "description": "Numerical pairing tolerance for scripted M0 weld contacts in SI units.",
+  "contact_gap_m": 0.000001
+}
