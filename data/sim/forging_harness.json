@@ -18,5 +18,6 @@
   "hammer_mass_kg": 0.5,
   "hammer_speed_m_s": 0.1,
   "maximum_working_strikes": 6,
-  "settle_steps": 12
+  "settle_steps": 12,
+  "refining_interval_s": 5.0
 }

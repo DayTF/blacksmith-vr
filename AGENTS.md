@@ -772,3 +772,7 @@ remelting. The continuous molten interval and both removal operations have
 headless coverage. Integration with cooling and subsequent forging awaits that
 decision. The M0 harness can exercise the already merged forging processes
 independently of this decision.
+
+The headless forging replay also runs a separate preheated refining charge.
+Its molten checkpoints verify the forge cap, migration without discard and
+explicit skimming with conserved accounted mass.
