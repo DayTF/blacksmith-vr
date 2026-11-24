@@ -50,10 +50,18 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          godot --headless --path . --script tests/check_scripts.gd 2>&1 | tee -a "$RUNNER_TEMP/godot-import.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-import.log"; then
             echo 'Godot reported import or script errors.' >&2
             exit 1
           fi
 
       - name: Run simulation suites
-        run: godot --headless --path . --script tests/run_all.gd
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script tests/run_all.gd 2>&1 | tee "$RUNNER_TEMP/godot-tests.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-tests.log"; then
+            echo 'Godot reported errors while running simulation suites.' >&2
+            exit 1
+          fi
