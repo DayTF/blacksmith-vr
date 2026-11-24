@@ -18,7 +18,8 @@ permission. Keep this guide current when decisions or public sim APIs change.
 
 ## Stack and layout
 
-- Godot **4.7+ Standard**, GDScript, **Forward+ and Vulkan**. CI currently pins
+- Godot **4.7+ Standard**, GDScript with the approved native C++ hot-loop exception
+  below, **Forward+ and Vulkan**. CI currently pins
   Godot 4.7.2 Standard. The starter project's Windows D3D12 setting was corrected
   to Vulkan with user approval.
 - OpenXR with SteamVR runtime. Track the controller/hammer tip at knuckle-level
@@ -33,6 +34,9 @@ permission. Keep this guide current when decisions or public sim APIs change.
   hidden in per-frame scene code. No game-state autoload singletons; use direct
   references or a simple service locator.
 - `src/vr/`: OpenXR and controller adapters.
+- `native/`: approved C++ mechanics kernel, thin RefCounted GDExtension bridge,
+  pinned build dependency and standalone tests. The kernel has no Godot headers
+  or rendering/input/scene dependencies. Keep the GDScript correctness reference.
 - `assets/`, `data/`, `shaders/`, `tests/sim/`: assets, JSON, shaders and headless
   simulation suites respectively. `tests/run_all.gd` is the suite entrypoint.
 
@@ -213,6 +217,9 @@ and merging passing PRs are already authorized.
 Run with Godot Standard 4.7+ (`godot` below means your installed binary):
 
 ```sh
+cmake -S native -B .build/native -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build .build/native --parallel 2
+ctest --test-dir .build/native --output-on-failure
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script tests/check_scripts.gd
 godot --headless --path . --script tests/run_all.gd
@@ -383,7 +390,98 @@ records the initial reference result: 5,000 nodes, 14,050 links, 4,104 volume ce
 Ryzen 9 5900X. Median step time was **2,525.593 ms**, versus **<1 ms** required.
 This is a severe miss, not a 90 Hz-ready solver. The benchmark is not an XR test.
 
-The GDScript implementation is a correctness reference, not an approved runtime
-performance solution. Native acceleration, a different solver/resolution, or
-relaxing the budget needs a user decision under the original risk/portability
-rules. Keep M0 and M1 gated; do not silently reduce node count or change language.
+The user approved a native C++ GDExtension hot loop and build tooling in #31;
+implementation is #32. The GDScript solver stays as the correctness reference.
+Native optimization within the existing material/physics contract is authorized;
+do not ask for that permission again. No change in resolution, fidelity or the
+performance target is approved. Keep M0/M1 gated until the budget is validated.
+
+
+## Native mechanics API and build (issue #32)
+
+`native/src/solver.cpp` and `native/include/solver.hpp` contain portable C++17
+math/curves and contiguous numerical state. `native/src/extension.cpp` translates
+Godot variants and exposes `BlacksmithNativeCore : RefCounted`. The native layer
+has no per-metal branches or rendering/input/scene dependencies. It preserves the
+approved yielding/fracture/volume rules; the optimized volume identity is
+cross-checked against the original six-tetrahedron gradients on warped cells.
+
+- `src/sim/native_granular_billet.gd` mirrors construction, grid/manual assembly,
+  `step`, `hammer`, mass, tuning, material library and node/link/cell views.
+  Instantiate it with the same loaded library and tuning as the reference.
+- Mutable `nodes`, `connections` and `cells` views remain compatible, including
+  retained outer arrays, node dictionaries and nested impurity dictionaries.
+  Once exposed, they are validated/uploaded and updated in place each step. This
+  compatibility path is deliberately measured separately; it is expensive.
+- `commit_state()` explicitly transfers authority from these views to native
+  resident state. Retained old references are no longer authoritative after this
+  call. Accessing a dictionary view again restores current canonical state and
+  re-enters compatibility mode. Released-view mutations cannot corrupt the solver.
+- Use `positions_snapshot()` for packed position output without exposing mutable
+  dictionaries, and native `hammer()`/`step()` for runtime updates. Future scene
+  adapters should avoid fetching all node dictionaries every frame. Diagnostics
+  and construction may use those views as needed.
+- `MaterialCurve.export_graph()`, `MaterialDefinition.export_runtime()` and
+  `MaterialLibrary.export_runtime_catalog()` normalize the already validated
+  property graphs and cumulative phase sets. Native graphs support the same
+  interpolation, scalar/vector composition, arbitrary supplied numeric axes,
+  endpoint rules and missing-input failure behavior. Mechanical samples still
+  supply temperature/strain, as in the reference.
+- `MaterialLibrary.get_revision()` advances only on successful catalog reload.
+  The adapter refreshes compiled native materials and remaps point identities
+  after reload, including insertion of sorted material IDs. Bad reloads preserve
+  the prior library/native state. Add a material by file, without native code.
+- `enable_profiling(true)`, `profile_snapshot()` and `kernel_elapsed_usec()` expose
+  optional native phase timings. Profiling does not change solver settings.
+  All failed native steps retain prior numerical state. Native tests are required,
+  not skipped when the library is missing.
+
+Build requirements: C++17 compiler, CMake >=3.24, Ninja and Python 3. godot-cpp
+10.0.0-stable is pinned by commit and SHA256 in CMake, targeting the Godot 4.7 API.
+Its minimal profile includes RefCounted and OS (OS is needed by the SDK's own
+print helper, not the numerical solver). The SDK's MIT notice is retained in
+`native/third_party_notices.txt`. Binaries and dependency caches are ignored.
+For a kernel-only build without any Godot SDK, configure a separate build directory
+with `-DBLACKSMITH_BUILD_EXTENSION=OFF` and run its CTest suite.
+Build **before** importing/running the project; the manifest expects a native
+library. Linux x86_64 is tested. Windows paths/build output are configured but
+Windows native compilation and XR hardware have not been validated yet.
+
+The current WSL user cannot install system packages without a sudo password.
+An isolated GCC 9.4/sysroot and CMake 3.27.9 were extracted under
+`/tmp/blacksmith-toolchain/` without system changes. Existing `.build/native`
+uses `/tmp/blacksmith-toolchain/toolchain.cmake`; SDK source is cached under
+`/tmp/blacksmith-setup/sdk/`. To use that cache, prefix build commands with:
+
+```sh
+env LD_LIBRARY_PATH=/tmp/blacksmith-toolchain/root/usr/lib/x86_64-linux-gnu \
+  PATH=/tmp/blacksmith-toolchain/root/usr/bin:/usr/bin:/bin \
+  /tmp/blacksmith-toolchain/cmake-3.27.9-linux-x86_64/bin/cmake --build .build/native --parallel 6
+```
+
+These temporary files are ephemeral. Standard installed toolchains and CI use the
+normal commands above. The user's toolchain/native authorization persists.
+
+### Native performance checkpoint: still not within budget
+
+`benchmarks/native-mechanics.json` records the same 5,000-node/14,050-link/4,104-cell
+case with **unchanged 4 substeps x 8 iterations**. Median whole resident step:
+**15.237 ms**, versus the **2,525.593 ms** GDScript baseline. Mutable-view
+compatibility: **163.918 ms**. All cells remained active, no links broke and state
+stayed finite. These are CPU headless measurements, not XR frame measurements.
+
+Run the existing benchmark with `-- --backend=native-resident`,
+`-- --backend=native-compatibility`, or add `--profile` for phase timings.
+Reported step time includes GDScript adapter overhead; native kernel timings are
+also recorded. Upload/ownership transfer and final diagnostic snapshots are
+outside resident step timing. The profiled run places most remaining cost in
+spring and volume projections. Invariant arithmetic is cached, volume algebra
+is simplified and fixed-state material queries are cached; no iteration or grid
+reduction was used to obtain the reported speedup.
+
+The **<1 ms** sim gate remains unmet, and even the native mechanics step alone
+exceeds the full 90 Hz frame budget. Continue native hot-loop profiling/optimization in **#33**
+before claiming performance readiness. Do not close M0, start M1, or suggest a
+playtest based on these headless results. Remaining thermal/process/harness work
+is still #10–#14. Preserve physical invariants and native/reference agreement
+while optimizing; this checkpoint does not authorize silently reducing fidelity.

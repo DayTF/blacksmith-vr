@@ -7,6 +7,7 @@ const CurveGraph = preload("res://src/sim/material_curve.gd")
 
 var errors := PackedStringArray()
 var _materials: Dictionary = {}
+var _revision := 0
 
 
 func load_directory(path: String, defaults_filename: String = "defaults.json") -> bool:
@@ -45,7 +46,19 @@ func load_directory(path: String, defaults_filename: String = "defaults.json") -
 	if not errors.is_empty():
 		return false
 	_materials = candidates
+	_revision += 1
 	return true
+
+
+func get_revision() -> int:
+	return _revision
+
+
+func export_runtime_catalog() -> Dictionary:
+	var result: Dictionary = {}
+	for id in material_ids():
+		result[id] = _materials[id].export_runtime()
+	return result
 
 
 func material_ids() -> PackedStringArray:

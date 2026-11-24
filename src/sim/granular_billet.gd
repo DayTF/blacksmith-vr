@@ -247,6 +247,7 @@ func _plasticity(positions: Array[Vector3], properties: Array[Dictionary], rests
 		var yield_strength: float = minf(properties[a].yield_strength, properties[b].yield_strength)
 		var ductility: float = minf(properties[a].ductility, properties[b].ductility)
 		if modulus == 0.0:
+			stiffnesses[index] = 0.0
 			continue
 		var length := maxf(positions[a].distance_to(positions[b]), tuning.minimum_length_m)
 		var strain := (length - rests[index]) / rests[index]
