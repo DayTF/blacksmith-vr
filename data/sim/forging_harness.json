@@ -1,0 +1,22 @@
+{
+  "description": "Small deterministic M0 process demonstration. The mechanics benchmark uses its own full-size fixture.",
+  "width_points": 3,
+  "length_points": 5,
+  "base_height_points": 3,
+  "leaf_height_points": 2,
+  "spacing_m": 0.015,
+  "base_material": "prototype_mithril",
+  "leaf_material": "prototype_embersteel",
+  "initial_temperature_c": 1350,
+  "welding_temperature_c": 1375,
+  "working_boundary_c": 1120,
+  "working_temperature_max_c": 1190,
+  "quench_temperature_max_c": 1000,
+  "maximum_thermal_steps": 1800,
+  "step_s": 0.011111111111111112,
+  "hammer_radius_m": 0.023,
+  "hammer_mass_kg": 0.5,
+  "hammer_speed_m_s": 0.1,
+  "maximum_working_strikes": 6,
+  "settle_steps": 12
+}
