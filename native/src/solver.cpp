@@ -122,6 +122,8 @@ bool Parameters::valid() const {
            maximum_step >= minimum_step && std::isfinite(minimum_length) && minimum_length > 0 &&
            std::isfinite(anvil) && std::isfinite(anvil_friction) && anvil_friction >= 0 &&
            gravity.finite() && substeps > 0 && iterations > 0 &&
+           std::isfinite(maximum_density_multiplier) &&
+           (maximum_density_multiplier == 0 || maximum_density_multiplier >= 1) &&
            std::isfinite(transfer) && transfer >= 0 && transfer <= 1 && std::isfinite(depth) &&
            depth >= 0 && std::isfinite(tolerance) && tolerance >= 0;
 }
@@ -289,6 +291,8 @@ bool Solver::step(double dt) {
             record(3, phase_start);
             phase_start = now();
             solve_volumes(inverse_h);
+            if (parameters.maximum_density_multiplier > 0)
+                limit_compression(inverse_h);
             record(4, phase_start);
             phase_start = now();
             project_anvil(projection_points, parameters.anvil, h, anvil_support);
@@ -319,6 +323,10 @@ bool Solver::step(double dt) {
             }
         }
         record(5, phase_start);
+    }
+    if (parameters.maximum_density_multiplier > 0 && !compression_resolved()) {
+        error = "Compression limit did not converge; state retained.";
+        return false;
     }
     phase_start = now();
     orientations();
@@ -427,6 +435,63 @@ void Solver::solve_volumes(float inverse_h) {
         }
         volume_lambdas[i] += change;
     }
+}
+static constexpr std::array<int, 6> compression_ring{1, 3, 2, 6, 4, 5};
+
+void Solver::limit_compression(float inverse_h) {
+    // This is compression support only, even in cells whose structural edges
+    // have fractured. Each of the six regular-grid tetrahedra is constrained.
+    const auto &ring = compression_ring;
+    for (const auto &cell : work.cells) {
+        const double minimum = cell.rest / (6 * parameters.maximum_density_multiplier);
+        for (size_t i = 0; i < ring.size(); ++i) {
+            const std::array<int, 4> ids{cell.nodes[0], cell.nodes[ring[i]],
+                                        cell.nodes[ring[(i + 1) % ring.size()]], cell.nodes[7]};
+            const V root = projection_points[ids[0]].position;
+            const V a = projection_points[ids[1]].position - root;
+            const V b = projection_points[ids[2]].position - root;
+            const V c = projection_points[ids[3]].position - root;
+            const V ga = b.cross(c) / 6.0;
+            const double current = a.dot(ga);
+            if (current >= minimum)
+                continue;
+            const V gb = c.cross(a) / 6.0;
+            const V gc = a.cross(b) / 6.0;
+            std::array<V, 4> gradients{-ga - gb - gc, ga, gb, gc};
+            double denominator = 0;
+            for (size_t j = 0; j < ids.size(); ++j) {
+                const auto &n = projection_points[ids[j]];
+                auto &gradient = gradients[j];
+                if (n.position.y <= parameters.anvil && gradient.y < 0)
+                    gradient.y = 0;
+                denominator += gradient.dot(gradient) * n.inverse_mass;
+            }
+            if (denominator <= 0)
+                continue;
+            const double change = (minimum - current) / denominator;
+            for (size_t j = 0; j < ids.size(); ++j) {
+                auto &n = projection_points[ids[j]];
+                const V correction = gradients[j] * (change * n.inverse_mass);
+                n.position += correction;
+                n.velocity += correction * inverse_h;
+            }
+        }
+    }
+}
+bool Solver::compression_resolved() const {
+    const auto &ring = compression_ring;
+    for (const auto &cell : work.cells) {
+        const double minimum_six_volume = 0.99 * cell.rest / parameters.maximum_density_multiplier;
+        const V root = work.nodes[cell.nodes[0]].position;
+        const V diagonal = work.nodes[cell.nodes[7]].position - root;
+        for (size_t i = 0; i < ring.size(); ++i) {
+            const V a = work.nodes[cell.nodes[ring[i]]].position - root;
+            const V b = work.nodes[cell.nodes[ring[(i + 1) % ring.size()]]].position - root;
+            if (a.dot(b.cross(diagonal)) < minimum_six_volume)
+                return false;
+        }
+    }
+    return true;
 }
 void Solver::damp(double h) {
     for (const auto &l : work.links) {

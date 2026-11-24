@@ -108,7 +108,7 @@ struct Parameters {
     double transfer = 0, depth = 0, tolerance = 0;
     int substeps = 0, iterations = 0;
     V gravity;
-    double anvil_friction = 0;
+    double anvil_friction = 0, maximum_density_multiplier = 0;
     bool valid() const;
 };
 struct Volume {
@@ -141,6 +141,8 @@ class Solver {
     void plasticity();
     void solve_links(float inverse_h);
     void solve_volumes(float inverse_h);
+    void limit_compression(float inverse_h);
+    bool compression_resolved() const;
     void damp(double h);
     void orientations();
 };

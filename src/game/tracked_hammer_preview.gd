@@ -26,6 +26,7 @@ func _ready() -> void:
 		set_process(false)
 		return
 	session.billet.tuning.anvil_friction_coefficient = _settings.anvil_friction_coefficient
+	session.billet.tuning.maximum_density_multiplier = _settings.maximum_density_multiplier
 	_stage_floor_y = -_settings.anvil_height_m
 	_build_stage()
 	_add_hammer_handle()
