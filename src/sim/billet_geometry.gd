@@ -25,6 +25,29 @@ static func volume_state(positions: Array[Vector3], ids: PackedInt32Array) -> Di
 	return {"volume": volume, "gradients": gradients}
 
 
+static func connected_components(node_count: int, links: Array[Dictionary], broken: PackedByteArray) -> PackedInt32Array:
+	var roots := PackedInt32Array()
+	roots.resize(node_count)
+	for id in node_count:
+		roots[id] = id
+	for index in links.size():
+		if broken[index]:
+			continue
+		var a := _root(roots, links[index].a)
+		var b := _root(roots, links[index].b)
+		roots[maxi(a, b)] = mini(a, b)
+	for id in node_count:
+		roots[id] = _root(roots, id)
+	return roots
+
+
+static func _root(roots: PackedInt32Array, id: int) -> int:
+	while roots[id] != id:
+		roots[id] = roots[roots[id]]
+		id = roots[id]
+	return id
+
+
 static func update_orientations(nodes: Array[Dictionary], cells: Array[Dictionary],
 		positions: Array[Vector3], active: PackedByteArray) -> void:
 	var x_axes: Array[Vector3] = []

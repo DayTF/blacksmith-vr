@@ -103,9 +103,9 @@ func _process(delta: float) -> void:
 	var hammer_transform := _hammer.transform
 	_refresh()
 	_hammer.transform = hammer_transform
-	_status.text = "%s\n%d tracked hits · %.2f ms sim · %d host FPS" % [
+	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS" % [
 		_source if not _source.is_empty() else "Waiting for right-hand tracking",
-		session.strikes, session.step_ms, Engine.get_frames_per_second()]
+		session.strikes, session.summary().broken, session.step_ms, Engine.get_frames_per_second()]
 	_frame_report += delta
 	if _frame_report >= 5.0:
 		_frame_report = 0.0

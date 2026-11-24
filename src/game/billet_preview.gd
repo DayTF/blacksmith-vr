@@ -3,6 +3,7 @@ extends Node3D
 
 const Session = preload("res://src/game/preview_session.gd")
 const LayeredSession = preload("res://src/game/layered_preview_session.gd")
+const FractureGeometry = preload("res://src/game/fracture_preview_geometry.gd")
 
 @export var layered_replay := false
 var session: RefCounted = Session.new()
@@ -10,6 +11,7 @@ var _surface := MeshInstance3D.new()
 var _wire := MeshInstance3D.new()
 var _hammer := MeshInstance3D.new()
 var _purification_sites := MultiMeshInstance3D.new()
+var _fragments := MultiMeshInstance3D.new()
 var _camera := Camera3D.new()
 var _status := Label.new()
 var _pause: Button
@@ -128,6 +130,23 @@ func _build_stage() -> void:
 	_purification_sites.multimesh.instance_count = session.billet.nodes.size()
 	_purification_sites.multimesh.visible_instance_count = 0
 	add_child(_purification_sites)
+	var fragment_mesh := SphereMesh.new()
+	fragment_mesh.radius = session.config.spacing_m * 0.12
+	fragment_mesh.height = fragment_mesh.radius * 2.0
+	fragment_mesh.radial_segments = 8
+	fragment_mesh.rings = 4
+	var fragment_material := StandardMaterial3D.new()
+	fragment_material.vertex_color_use_as_albedo = true
+	fragment_material.metallic = 0.55
+	fragment_mesh.material = fragment_material
+	var fragment_instances := MultiMesh.new()
+	fragment_instances.transform_format = MultiMesh.TRANSFORM_3D
+	fragment_instances.use_colors = true
+	fragment_instances.mesh = fragment_mesh
+	fragment_instances.instance_count = session.billet.nodes.size()
+	fragment_instances.visible_instance_count = 0
+	_fragments.multimesh = fragment_instances
+	add_child(_fragments)
 	add_child(_camera)
 	_camera.near = 0.005
 	_camera.far = 10.0
@@ -168,16 +187,18 @@ func _cache_faces() -> void:
 
 func _refresh() -> void:
 	var nodes: Array = session.billet.nodes
+	var links: Array[Dictionary] = session.billet.connections
+	var severed := FractureGeometry.broken_pairs(links)
 	var triangles := SurfaceTool.new()
 	triangles.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for face: Array in _faces:
-		for triangle in [[0, 1, 2], [0, 2, 3]]:
-			var a: Vector3 = nodes[face[triangle[0]]].position
-			var b: Vector3 = nodes[face[triangle[1]]].position
-			var c: Vector3 = nodes[face[triangle[2]]].position
+		for triangle: Array in FractureGeometry.visible_triangles(face, severed):
+			var a: Vector3 = nodes[triangle[0]].position
+			var b: Vector3 = nodes[triangle[1]].position
+			var c: Vector3 = nodes[triangle[2]].position
 			var normal := (b - a).cross(c - a).normalized()
-			for corner: int in triangle:
-				var node: Dictionary = nodes[face[corner]]
+			for id: int in triangle:
+				var node: Dictionary = nodes[id]
 				var rgb: PackedFloat64Array = session.materials.sample(node.material_id, "color", {"temperature": node.temperature})
 				var emission: float = session.materials.sample(node.material_id, "emission_energy", {"temperature": node.temperature}) * session.config.emission_scale
 				triangles.set_uv2(Vector2(emission, 0))
@@ -191,11 +212,27 @@ func _refresh() -> void:
 	_surface.mesh = triangles.commit()
 	var lines := SurfaceTool.new()
 	lines.begin(Mesh.PRIMITIVE_LINES)
-	for link: Dictionary in session.billet.connections:
-		lines.set_color(Color("ff3158") if link.broken else Color("322b22"))
+	lines.set_color(Color("322b22"))
+	var bonded := PackedByteArray()
+	bonded.resize(nodes.size())
+	for link in links:
+		if link.broken:
+			continue
 		for index: int in [link.a, link.b]:
+			bonded[index] = 1
 			lines.add_vertex(nodes[index].position + Vector3.UP * 0.00015)
 	_wire.mesh = lines.commit()
+	var fragment_count := 0
+	if not severed.is_empty():
+		for index in nodes.size():
+			if bonded[index]:
+				continue
+			var fragment: Dictionary = nodes[index]
+			var rgb: PackedFloat64Array = session.materials.sample(fragment.material_id, "color", {"temperature": fragment.temperature})
+			_fragments.multimesh.set_instance_transform(fragment_count, Transform3D(Basis.IDENTITY, fragment.position))
+			_fragments.multimesh.set_instance_color(fragment_count, Color(rgb[0], rgb[1], rgb[2]))
+			fragment_count += 1
+	_fragments.multimesh.visible_instance_count = fragment_count
 	var marker_count := 0
 	for index in nodes.size():
 		var marked: bool = session.weld_marker_nodes.has(index) if layered_replay else session.purified_nodes[index] != 0
@@ -213,7 +250,7 @@ func _refresh() -> void:
 	if session.finished or session.thermal_inspection:
 		_hammer.position = Vector3(-0.07, 0.08, -0.06)
 	var summary: Dictionary = session.summary()
-	_status.text = "%s\n\n%.0f °C mean · %.0f–%.0f °C range\n%d matter points  ·  %d strikes\n%d broken links (red)\nMean plastic strain: %.4f\nImpurities: %.3f mg · slag: %.3f µg\nPurified surface points: %d\nLast sim + processes: %.1f ms\n\n%s" % [
+	_status.text = "%s\n\n%.0f °C mean · %.0f–%.0f °C range\n%d matter points  ·  %d strikes\n%d severed links\nMean plastic strain: %.4f\nImpurities: %.3f mg · slag: %.3f µg\nPurified surface points: %d\nLast sim + processes: %.1f ms\n\n%s" % [
 		session.materials.get_material(session.config.material_id).raw_data.name,
 		summary.temperature_mean, summary.temperature_min, summary.temperature_max, summary.nodes, session.strikes, summary.broken, summary.strain,
 		summary.impurity_mass_kg * 1e6, summary.discarded_mass_kg * 1e9, summary.purified_nodes, session.step_ms,
@@ -291,7 +328,7 @@ func _build_ui() -> void:
 	sites.toggled.connect(func(visible_sites: bool): _purification_sites.visible = visible_sites)
 	column.add_child(sites)
 	var note := Label.new()
-	note.text = "Right-drag: orbit · Wheel: zoom\n\nMode menu keeps the billet; Replay resets.\nFantasy tuning · Scripted desktop controls.\nRed: failure · Cyan: impurity release sites\nSurface mesh does not split at cracks yet."
+	note.text = "Right-drag: orbit · Wheel: zoom\n\nMode menu keeps the billet; Replay resets.\nFantasy tuning · Scripted desktop controls.\nCyan: impurity release sites\nOpen faces show severed lattice edges."
 	note.add_theme_font_size_override("font_size", 14)
 	note.modulate = Color("a6b8ca")
 	column.add_child(note)
