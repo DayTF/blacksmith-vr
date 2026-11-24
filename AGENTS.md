@@ -733,3 +733,23 @@ Tests cover single-material folds, mixed-material stacks, burial/re-exposure,
 cold failures, weaker and full bonds, strike gating and conservation through
 native/reference mechanics steps. The scripted API is for M0 and the future
 forging harness. The desktop preview and XR input are unaffected. Next is #13.
+
+## Melt separation in progress (#13)
+
+`src/sim/melt_separation.gd` stages rate-based migration during a molten
+interval. `advance(billet, equipment, dt)` uses local melt fraction, the
+material separation efficiency and each impurity's separation rate. Equipment
+sets a temperature cap and permissible destinations. The provisional fixtures
+are in `data/sim/refining_equipment.json`.
+
+Staged entries in a node's `separated_impurities` dictionary are a subset of
+its `impurity_mass`. Migration alone does not change either matter mass or
+the discard ledger. `skim` releases the surface pool and `drain` releases
+the bottom pool, subtracting exactly that mass from the originating nodes and
+crediting the common discard ledger. Each call stages changes before committing.
+
+Issue #42 asks how an unremoved pool should behave across solidification and
+remelting. The continuous molten interval and both removal operations have
+headless coverage. Integration with cooling and subsequent forging awaits that
+decision. The M0 harness can exercise the already merged forging processes
+independently of this decision.

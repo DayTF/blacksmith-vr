@@ -1,0 +1,11 @@
+{
+  "description": "Provisional M0 equipment for scripted melt-separation tests and the forging harness.",
+  "forge": {
+    "maximum_temperature_c": 1400,
+    "separation_destinations": []
+  },
+  "refining_crucible": {
+    "maximum_temperature_c": 2200,
+    "separation_destinations": ["surface", "bottom"]
+  }
+}
