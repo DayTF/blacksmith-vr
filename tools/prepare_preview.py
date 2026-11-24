@@ -10,7 +10,7 @@ def main():
     target.mkdir(parents=True, exist_ok=True)
     # Copy an explicit allow-list: no native extension, generated cache, credentials
     # or developer files are needed to run the reference solver's small fixture.
-    for name in ("src/sim", "src/game", "data/materials", "data/sim", "data/preview", "scenes"):
+    for name in ("src/sim", "src/game", "data/materials", "data/sim", "data/preview", "scenes", "shaders"):
         shutil.copytree(root / name, target / name, dirs_exist_ok=True)
     for name in ("project.godot", "icon.svg"):
         shutil.copy2(root / name, target / name)

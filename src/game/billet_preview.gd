@@ -10,6 +10,7 @@ var _camera := Camera3D.new()
 var _status := Label.new()
 var _pause := Button.new()
 var _presets := OptionButton.new()
+var _environments := OptionButton.new()
 var _faces: Array = []
 var _yaw := 0.65
 var _pitch := 0.55
@@ -17,6 +18,8 @@ var _distance := 0.32
 var _capture_path := ""
 var _smoke := false
 var _before_strike := false
+var _thermal_capture := false
+var _quench_capture := false
 var _completed := false
 
 
@@ -26,6 +29,8 @@ func _ready() -> void:
 			_capture_path = argument.trim_prefix("--preview-capture=")
 		_smoke = _smoke or argument == "--preview-smoke"
 		_before_strike = _before_strike or argument == "--preview-before-strike"
+		_thermal_capture = _thermal_capture or argument == "--preview-heat" or argument == "--preview-quench"
+		_quench_capture = _quench_capture or argument == "--preview-quench"
 	if _smoke or not _capture_path.is_empty():
 		get_viewport().set_disable_input(true)
 	if not session.initialize():
@@ -33,6 +38,9 @@ func _ready() -> void:
 		return
 	if "--preview-cold" in OS.get_cmdline_user_args():
 		session.reset(float(session.config.temperature_presets_c[1]))
+	if _thermal_capture:
+		session.reset(float(session.config.temperature_presets_c[0 if _quench_capture else 1]))
+		session.inspect_environment(2 if _quench_capture else 1)
 	_build_stage()
 	_build_ui()
 	_cache_faces()
@@ -47,7 +55,7 @@ func _process(delta: float) -> void:
 	if not session.errors.is_empty():
 		_fail()
 		set_process(false)
-	elif (session.finished or (_before_strike and session.elapsed >= session.config.strike_interval_s - session.config.step_s * 2)) and not _completed and (_smoke or not _capture_path.is_empty()):
+	elif (session.finished or (_thermal_capture and session.elapsed >= session.environments.capture_duration_s) or (_before_strike and session.elapsed >= session.config.strike_interval_s - session.config.step_s * 2)) and not _completed and (_smoke or not _capture_path.is_empty()):
 		_completed = true
 		_finish_capture()
 
@@ -80,15 +88,8 @@ func _build_stage() -> void:
 	_box(Vector3(2, 0.01, 2), Vector3(0, -0.11, 0), Color("171e27"), 0.0)
 	add_child(_surface)
 	add_child(_wire)
-	var metal := StandardMaterial3D.new()
-	metal.vertex_color_use_as_albedo = true
-	metal.cull_mode = BaseMaterial3D.CULL_DISABLED
-	metal.metallic = 0.65
-	metal.roughness = 0.4
-	metal.emission_enabled = true
-	metal.emission = Color.WHITE
-	metal.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
-	metal.emission_energy_multiplier = session.config.emission_scale
+	var metal := ShaderMaterial.new()
+	metal.shader = preload("res://shaders/preview_metal.gdshader")
 	_surface.material_override = metal
 	var wire_material := StandardMaterial3D.new()
 	wire_material.vertex_color_use_as_albedo = true
@@ -141,8 +142,6 @@ func _cache_faces() -> void:
 
 func _refresh() -> void:
 	var nodes: Array = session.billet.nodes
-	_surface.material_override.emission_energy_multiplier = session.config.emission_scale * session.materials.sample(
-		session.config.material_id, "emission_energy", {"temperature": session.temperature})
 	var triangles := SurfaceTool.new()
 	triangles.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for face: Array in _faces:
@@ -154,6 +153,8 @@ func _refresh() -> void:
 			for corner: int in triangle:
 				var node: Dictionary = nodes[face[corner]]
 				var rgb: PackedFloat64Array = session.materials.sample(node.material_id, "color", {"temperature": node.temperature})
+				var emission: float = session.materials.sample(node.material_id, "emission_energy", {"temperature": node.temperature}) * session.config.emission_scale
+				triangles.set_uv2(Vector2(emission, 0))
 				triangles.set_normal(normal)
 				triangles.set_color(Color(rgb[0], rgb[1], rgb[2]))
 				triangles.add_vertex(node.position)
@@ -167,13 +168,13 @@ func _refresh() -> void:
 	_wire.mesh = lines.commit()
 	var phase: float = fmod(session.elapsed, session.config.strike_interval_s) / session.config.strike_interval_s
 	_hammer.position = session.contact + Vector3.UP * (0.01 + session.config.hammer_lift_m * sin(phase * PI))
-	if session.finished:
+	if session.finished or session.thermal_inspection:
 		_hammer.position = Vector3(-0.07, 0.08, -0.06)
 	var summary: Dictionary = session.summary()
-	_status.text = "%s\n\n%.0f °C  ·  prescribed, constant\n%d matter points  ·  %d strikes\n%d broken links (red)\nMean plastic strain: %.4f\nLast sim step: %.1f ms\n\n%s" % [
+	_status.text = "%s\n\n%.0f °C mean · %.0f–%.0f °C range\n%d matter points  ·  %d strikes\n%d broken links (red)\nMean plastic strain: %.4f\nLast sim + heat step: %.1f ms\n\n%s" % [
 		session.materials.get_material(session.config.material_id).raw_data.name,
-		session.temperature, summary.nodes, session.strikes, summary.broken, summary.strain, session.step_ms,
-		"Demo complete — replay or inspect" if session.finished else ("Paused" if session.paused else "Synthetic impacts running")]
+		summary.temperature_mean, summary.temperature_min, summary.temperature_max, summary.nodes, session.strikes, summary.broken, summary.strain, session.step_ms,
+		"Paused" if session.paused else ("Thermal inspection · " + session.boundary.id if session.thermal_inspection else ("Demo complete — replay or inspect" if session.finished else "Synthetic impacts · constant temperature"))]
 
 
 func _build_ui() -> void:
@@ -210,8 +211,20 @@ func _build_ui() -> void:
 		_pause.text = "Resume" if session.paused else "Pause"
 		_refresh())
 	column.add_child(_pause)
+	_environments.add_item("Thermal inspection: choose environment")
+	_environments.set_item_disabled(0, true)
+	for environment: Dictionary in session.environments.environments:
+		_environments.add_item(environment.name)
+		if session.thermal_inspection and environment.id == session.boundary.id:
+			_environments.select(_environments.item_count - 1)
+	_environments.item_selected.connect(func(index: int):
+		if index > 0:
+			session.inspect_environment(index - 1)
+			_pause.text = "Pause"
+			_refresh())
+	column.add_child(_environments)
 	var note := Label.new()
-	note.text = "Right-drag: orbit · Wheel: zoom\n\nProvisional fantasy material / small grid\nTemperature is prescribed; no heat flow yet.\nNo purification, folding or VR input yet.\nRed links indicate failed connections;\nthe surface mesh does not split yet."
+	note.text = "Right-drag: orbit · Wheel: zoom\n\nThermal inspection stops synthetic strikes.\nChange environment to heat/cool/quench.\nReplay returns to constant-temperature hits.\nProvisional fantasy data / fixed heat areas\nNo purification, folding or VR input yet.\nRed links show failure; mesh does not split."
 	note.add_theme_font_size_override("font_size", 14)
 	note.modulate = Color("a6b8ca")
 	column.add_child(note)
@@ -222,6 +235,7 @@ func _restart(temperature: float) -> void:
 		_fail()
 		return
 	_pause.text = "Pause"
+	_environments.select(0)
 	_refresh()
 
 
@@ -260,7 +274,13 @@ func _finish_capture() -> void:
 		session.errors.append("Unstruck billet must have no damage or plastic strain.")
 		_fail()
 		return
-	if not _before_strike and result.strain <= 0.0 and result.broken == 0:
+	if _thermal_capture:
+		var correct: bool = result.temperature_mean < session.temperature if _quench_capture else result.temperature_mean > session.temperature
+		if not correct or (not _quench_capture and result.temperature_max > session.boundary.maximum_temperature_c):
+			session.errors.append("Thermal preview failed to respond within equipment limits.")
+			_fail()
+			return
+	if not _thermal_capture and not _before_strike and result.strain <= 0.0 and result.broken == 0:
 		session.errors.append("Demo produced neither plastic deformation nor fracture.")
 		_fail()
 		return

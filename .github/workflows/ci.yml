@@ -81,6 +81,8 @@ jobs:
           godot --headless --path .build/preview -- --preview-smoke --preview-cold --preview-before-strike 2>&1 | tee "$RUNNER_TEMP/preview-rest.log"
           godot --headless --path .build/preview -- --preview-smoke 2>&1 | tee "$RUNNER_TEMP/preview.log"
           godot --headless --path .build/preview -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path .build/preview -- --preview-smoke --preview-heat 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path .build/preview -- --preview-smoke --preview-quench 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/preview.log" "$RUNNER_TEMP/preview-rest.log"; then
             echo 'Godot reported desktop preview errors.' >&2
             exit 1

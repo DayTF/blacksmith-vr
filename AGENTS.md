@@ -298,7 +298,7 @@ var events = material.phase_events(1300.0, 1500.0)
   `plastic_strain_increment` is the current increment used by impurity-removal
   graphs; accumulated strain alone must never trigger continued purification.
   Hardness composes temperature and strain; `work_hardening_recovery` supplies a
-  temperature-dependent rate for the future thermal/mechanical solver.
+  temperature-dependent rate consumed by the thermal recovery solver.
 - `phase_transitions` have unique `id`, distinct `temperature` thresholds and
   `modifiers` keyed by property. A modifier optionally replaces `curve`, then
   applies `scale`, then `offset`. Sorted thresholds accumulate at/above their
@@ -321,8 +321,9 @@ var events = material.phase_events(1300.0, 1500.0)
   purification. These files do not establish real-world metallurgy.
 
 The material and granular mechanics layers have correctness tests. M0 remains
-open: thermal transport (#10), surface purification (#11), folding/welding (#12),
-melt separation (#13), and the complete forging harness (#14) remain. The early
+open: surface purification (#11), folding/welding (#12),
+melt separation (#13), and the complete forging harness (#14) remain. Thermal
+transport (#10) is implemented below. The early
 desktop inspection scene (#35) is an authorized development-order exception;
 tracked VR input and XR performance have not been validated.
 
@@ -497,8 +498,8 @@ exceeds the full 90 Hz frame budget. These measurements do not establish XR
 readiness. The latest user decision supersedes the previous development gate:
 prioritize a visible small-grid preview (#35), defer optimization (#33), and allow
 lower development frame rates. Keep the full benchmark unchanged and report the
-preview resolution separately. Remaining thermal/process/harness work is still
-#10–#14; M0 stays open until those criteria are satisfied.
+preview resolution separately. Remaining process/harness work is still
+#11–#14; thermal transport #10 is implemented below; M0 stays open until those criteria are satisfied.
 
 ## Development order: visual feedback first (user decision)
 
@@ -511,9 +512,9 @@ Do not spend the next session optimizing #33 before showing usable visual feedba
 #35 adds a small-grid, desktop-only scripted inspection scene. It is a preview of
 existing mechanics, not a completed forging game or VR build. Scripted hammer
 impacts are the already approved synthetic prototype input; replay/pause controls
-are inspection tools, not button-driven player forging. Constant prescribed hot/
-cold temperatures are fixture state, not heating, cooling or quenching. Keep these
-limits visible. Next expand visible thermal behavior (#10), then local surface
+are inspection tools, not button-driven player forging. The constant-temperature
+strike replay is distinct from the new live thermal inspection (#10). Keep these
+limits visible. Visible thermal behavior (#10) follows the initial preview; next is local surface
 purification (#11), and retain tracked controller integration in #15. Folding,
 welding and the full crafting lifecycle remain outstanding. Suggest trying the
 visual preview when available, accurately describing its limited interaction.
@@ -527,8 +528,8 @@ meshes/UI. The engine-light reference solver is unchanged. The session is a
 RefCounted synthetic harness in `src/game/preview_session.gd`, with `initialize`,
 `reset(prescribed_temperature)`, `advance(delta)` and `summary()`. It reads fixture
 setup from `data/preview/billet.json`, uses the existing mechanics tuning unchanged,
-and applies the existing hammer impulse API. It is not player input or thermal
-transport. The current fixture has 81 points and cannot establish benchmark speed.
+and applies the existing hammer impulse API. It is not player input. Its optional
+thermal inspection calls ThermalModel; strike replay retains constant temperature. The current fixture has 81 points and cannot establish benchmark speed.
 
 `python3 tools/prepare_preview.py` stages an allow-listed GDScript-only project
 under `.build/preview` so Windows users can launch the small reference fixture
@@ -566,5 +567,58 @@ preserve the historical 5,000-point / 14,050-link topology. The visible grid has
 additional links and is not a like-for-like performance comparison. Future timing
 reports must label topology. No performance optimization is part of this fix.
 `--preview-before-strike` checks/captures the cold scene with zero hits, plastic
-strain and broken links, and is also exercised in CI. Continue with visible thermal
-transport (#10) after this correction; optimization #33 remains deferred.
+strain and broken links, and is also exercised in CI. Visible thermal transport
+(#10) follows below; next is #11. Optimization #33 remains deferred.
+
+
+## Thermal transport and visual inspection (#10)
+
+`src/sim/thermal_model.gd` is a plain RefCounted class. Construct with a loaded
+material library and `data/sim/thermal.json`, then call
+`step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas:
+PackedFloat64Array, dt: float, boundary: Dictionary) -> bool`. No scene dependency.
+Nodes supply mass, position, material_id, temperature and plastic_strain. Links
+supply a/b and area (or thermal_area_m2); broken links do not conduct. Zero thermal
+area excludes mechanical-only bracing. Grid axial thermal areas come from dual-cell
+geometry, independently of spring area tuning. Generic manually constructed links
+fall back to their explicitly supplied area.
+
+The boundary supplies temperature_c, coefficient_property (a runtime material
+curve, e.g. quench_water), coefficient_scale and optionally maximum_temperature_c.
+The cap limits the boundary source, not pre-existing billet temperature. All
+convection and radiation use that capped boundary. Equipment names/settings are
+fixture data in data/preview/environments.json; the 1400 °C forge cap and transfer
+scale are provisional inspection tuning, not production equipment balance.
+
+Each pair exchanges equal and opposite energy using harmonic interface
+conductivity. Per-node capacity is mass × specific_heat(T, strain); Newton
+exchange uses the selected quench-response curve and radiation uses emissivity
+and Kelvin temperatures. Adaptive substeps bound each frozen update to the local
+heat-capacity/conductance limit. Capacity/material queries refresh each substep.
+The step is transactional on validation or substep-limit failure. No impurity,
+mass, rest-length or fracture-damage state is changed. Work-hardening strain
+recovers as exp(-curve_rate × dt); recovery never heals cracks. Successful
+phase_events contain threshold events with local node indices, and
+boundary_energy_j records boundary exchange for this step. Phase material
+modifiers continue to be queried normally at the new temperature.
+
+The thermal fixture uses `BilletGrid.reference_exposed_areas()` for initial dual
+boundary areas. Interior nodes have zero exposure; those areas sum to the initial
+box surface area. Areas are fixed for this inspection, including the bottom face,
+and are not a solution to deforming/folding/cracking surface detection. #11 must
+supply actual current exposure for purification; never reuse these fixture areas
+as a blanket claim that matter is exposed. Thermal expansion, latent heat, anvil
+contact exchange and quench stress are not implemented. No fluid simulation.
+
+The preview keeps constant-temperature strike replay, plus an environment menu
+that switches to unlimited thermal inspection with no synthetic strikes. The
+per-point color and emission curves feed a shader (energy through UV2, so HDR
+values are retained) and the panel shows local temperature range. Heating/quench
+capture flags run six simulated seconds. CI verifies these and pre-impact cold
+stability as well as all five sim suites. Windows RTX 3080 Ti / Forward+ rendering
+is covered; XR is not. Re-run tools/prepare_preview.py after source updates.
+
+Next actionable simulation work: surface-only purification #11, followed by
+folding/welding #12 and equipment-limited separation #13. Keep optimization #33
+deferred until more visual feedback is useful. M0 is still open; no full game loop
+or VR readiness is claimed.

@@ -4,7 +4,8 @@ A VR blacksmithing simulator with granular, data-driven materials and physical f
 
 Try the early desktop preview now. It shows a small live billet under synthetic
 hammer strikes: compare hot plastic deformation with cold fracture, replay/pause,
-and orbit the view. This is an inspection demo, before tracked VR input or the
+and orbit the view. Thermal inspection adds live heating, air cooling, and
+water/oil quenching. This is an inspection demo, before tracked VR input or the
 full forging loop.
 
 ```sh
@@ -20,14 +21,21 @@ extension build described in [AGENTS.md](AGENTS.md).
 - Right mouse drag: orbit. Mouse wheel: zoom.
 - Use the temperature dropdown to restart hot (1000 °C) or cold (20 °C).
 - Replay restarts the synthetic sequence; Pause/Resume allows inspection.
-- The panel reports plastic strain, broken links and the most recent CPU step.
+- Choose an environment in **Thermal inspection** to stop synthetic strikes and
+  heat, air-cool, or quench the billet. Switch environments repeatedly; Pause
+  freezes it. Replay returns to the constant-temperature strike demo.
+- The panel reports local temperature range, plastic strain, broken links and
+  the most recent CPU step.
   Red lattice links are broken; the surface mesh does not split at cracks yet.
 
-Temperatures are constant fixture inputs, not a heating/cooling simulation.
+The strike demo keeps its selected temperature constant. Thermal inspection uses
+local conduction, Newton cooling, radiation and material quench curves. The
+prototype forge requests 1600 °C but is capped at 1400 °C by fixture equipment
+data; these are provisional demo settings, not final equipment balance.
 Impurities, folding/welding, tracked hammering, naming and inventory are not wired
 into this preview. Materials and mechanics are provisional; this is useful visual
-feedback for development, not calibrated forging behavior. Both hot and cold billets now remain intact under their own weight
-before strikes. The hammer block
+feedback for development, not calibrated forging behavior. Both hot and cold
+billets now remain intact under their own weight before strikes. The hammer block
 illustrates scripted impacts; it is not a tracked or simulated rigid-body tool.
 
 The fixture preserves the solver's 4 substeps × 8 iterations and 1/90 s numerical
@@ -41,15 +49,26 @@ For automated scene verification or an actual rendered capture:
 ```sh
 godot --headless --path .build/preview -- --preview-smoke
 godot --headless --path .build/preview -- --preview-smoke --preview-cold
-godot --path .build/preview -- --preview-capture=/absolute/path/preview.png
+godot --headless --path .build/preview -- --preview-smoke --preview-heat
+godot --headless --path .build/preview -- --preview-smoke --preview-quench
+godot --path .build/preview -- --preview-heat --preview-capture=/absolute/path/preview.png
 ```
 
 Add `--preview-before-strike` to verify/capture the undamaged resting billet.
-The normal runs finish after six synthetic strikes and check for finite geometry and a
-mechanical response. Captures require a working graphical display and driver.
+Heat/quench captures run six simulated seconds without strikes.
+The normal strike runs finish after six synthetic strikes and check for finite
+geometry and a mechanical response. Captures require a working graphical display and driver.
 The preview has been rendered on Windows / RTX 3080 Ti / Vulkan Forward+ and run
 headlessly on Linux/WSL. No XR headset or tracked input is validated yet.
 
 Work is tracked in [GitHub issues](https://github.com/DayTF/blacksmith-vr/issues).
-The current priority is visual feedback (#35), thermal behavior (#10), local
-purification (#11), then broader manipulation and XR integration (#15).
+The next priorities are local surface purification (#11), broader manipulation
+and XR integration (#15). Optimization (#33) remains deferred.
+
+Thermal inspection currently uses reference grid surface areas and assumes the
+whole boundary sees the selected environment. It does not model anvil heat
+exchange, evolving fracture/fold surfaces, latent heat, thermal expansion or
+quench stress. These limits are separate from the local temperature/phase and
+work-hardening recovery now implemented.
+
+![Live forge heating](docs/previews/thermal-forge.png)
