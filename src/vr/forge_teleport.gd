@@ -14,6 +14,41 @@ const STATIONS := [
 const CLEARANCE := 0.22
 
 
+const STICK_PRESS := 0.60
+const STICK_RELEASE := 0.35
+
+var landing: Variant
+var active_hand := -1
+
+
+func update(inputs: Array[Dictionary]) -> Variant:
+	if active_hand < 0:
+		for hand in inputs.size():
+			if not inputs[hand].is_empty() and _engaged(inputs[hand], STICK_PRESS):
+				active_hand = hand
+				break
+	if active_hand < 0:
+		return null
+
+	var sample := inputs[active_hand]
+	if not sample.is_empty() and _engaged(sample, STICK_RELEASE):
+		landing = target(sample.pose)
+		return null
+
+	# Commit the marker the player saw while aiming, rather than sampling a
+	# new destination from the wrist movement that returns the stick to center.
+	var chosen: Variant = null
+	if not sample.is_empty() and sample.stick.length() <= STICK_RELEASE:
+		chosen = landing
+	landing = null
+	active_hand = -1
+	return chosen
+
+
+func _engaged(sample: Dictionary, threshold: float) -> bool:
+	return sample.click or sample.stick.y >= threshold
+
+
 static func target(ray: Transform3D) -> Variant:
 	if not ray.is_finite() or absf(ray.origin.x) >= 2.0 or ray.origin.z <= -2.82 or ray.origin.z >= 3.18:
 		return null

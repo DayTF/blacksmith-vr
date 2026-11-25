@@ -27,9 +27,9 @@ var _left_tools := WorldTools.new()
 var _pickup_beams: Array[MeshInstance3D] = []
 var _point_targets := PackedInt32Array([-1, -1])
 var _point_age := PackedFloat64Array([INF, INF])
-var _aiming := false
-var _teleport_target: Variant
+var _teleport := Teleport.new()
 var _landing := MeshInstance3D.new()
+var _teleport_beam: MeshInstance3D
 var _frame_report := 0.0
 
 
@@ -160,21 +160,33 @@ func _build_tools() -> void:
 	_left_tools.tools = _tools.tools
 	_tools.pose_filter = _constrain_tool
 	_left_tools.pose_filter = _constrain_tool
+	for hand in 2:
+		_pickup_beams.append(_create_beam(Color(1.0, 0.22, 0.12)))
+	_teleport_beam = _create_beam(Color(0.28, 0.92, 0.74))
+
+
+func _create_beam(color: Color) -> MeshInstance3D:
 	var shape := CylinderMesh.new()
 	shape.height = 1.0
 	shape.top_radius = 0.002
 	shape.bottom_radius = 0.002
-	var finish_beam := StandardMaterial3D.new()
-	finish_beam.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	finish_beam.albedo_color = Color(1.0, 0.22, 0.12)
-	shape.material = finish_beam
-	for hand in 2:
-		var beam := MeshInstance3D.new()
-		beam.mesh = shape
-		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		beam.hide()
-		add_child(beam)
-		_pickup_beams.append(beam)
+	var finish := StandardMaterial3D.new()
+	finish.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	finish.albedo_color = color
+	shape.material = finish
+	var beam := MeshInstance3D.new()
+	beam.mesh = shape
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beam.hide()
+	add_child(beam)
+	return beam
+
+
+func _draw_beam(beam: MeshInstance3D, origin: Vector3, direction: Vector3, distance: float) -> void:
+	var length := maxf(0.002, distance)
+	beam.transform = Transform3D(Basis(Quaternion(Vector3.UP, direction)).scaled_local(
+		Vector3(1.0, length, 1.0)), origin + direction * length * 0.5)
+	beam.show()
 
 
 func _prop_inventory_ready() -> bool:
@@ -267,6 +279,8 @@ func _update_tool_hand(hand: int, grip: RefCounted, unavailable: int, sample: Di
 	var beam := _pickup_beams[hand]
 	beam.hide()
 	_point_age[hand] += delta
+	if _teleport.active_hand == hand:
+		_point_targets[hand] = -1
 	if sample.is_empty():
 		_point_targets[hand] = -1
 	else:
@@ -275,16 +289,12 @@ func _update_tool_hand(hand: int, grip: RefCounted, unavailable: int, sample: Di
 		var aim: Dictionary = _tracking.pickup_ray(hand == 1)
 		sample.trigger = aim.get("trigger", sample.pressure if sample.source == "hand" else 0.0)
 		var committing: bool = sample.trigger >= _settings.grab_press and _point_age[hand] <= 0.12 and _point_targets[hand] >= 0
-		if grip.held < 0 and aim.has("ray") and not committing:
+		if grip.held < 0 and aim.has("ray") and not committing and _teleport.active_hand != hand:
 			var ray: Transform3D = stage_from_world * aim.ray
 			var hit := IndexRay.nearest(ray, _tools.tools, 5.0, unavailable)
 			_point_targets[hand] = hit.target
 			_point_age[hand] = 0.0
-			var direction := -ray.basis.z.normalized()
-			var distance: float = maxf(0.002, hit.distance)
-			beam.transform = Transform3D(Basis(Quaternion(Vector3.UP, direction)).scaled_local(
-				Vector3(1.0, distance, 1.0)), ray.origin + direction * distance * 0.5)
-			beam.show()
+			_draw_beam(beam, ray.origin, -ray.basis.z.normalized(), hit.distance)
 		if _point_age[hand] <= 0.12:
 			sample.remote_target = _point_targets[hand]
 	if grip.update(sample, _settings.grab_reach_m, _settings.grab_press, _settings.grab_release, unavailable):
@@ -301,23 +311,22 @@ func _held_hammer() -> int:
 	return -1
 
 func _update_teleport() -> void:
-	var sample: Dictionary = _tracking.aim()
-	if sample.is_empty():
-		_aiming = false
-		_teleport_target = null
-	elif sample.stick > (0.35 if _aiming else 0.65):
-		_aiming = true
-		_teleport_target = Teleport.target(global_transform.affine_inverse() * sample.pose)
-	elif _aiming:
-		_aiming = false
-		var target: Variant = Teleport.target(global_transform.affine_inverse() * sample.pose)
-		if _teleport_target is Vector3 and target is Vector3 and target.distance_to(_teleport_target) <= 0.10:
-			_tracking.position += Teleport.room_shift(_teleport_target, to_local(_tracking.head_position()))
-			_sweep.reset_tracking()
-		_teleport_target = null
-	_landing.visible = _teleport_target is Vector3
+	var stage_from_world := global_transform.affine_inverse()
+	var inputs: Array[Dictionary] = [_tracking.teleport_input(false), _tracking.teleport_input(true)]
+	for sample in inputs:
+		if not sample.is_empty():
+			sample.pose = stage_from_world * sample.pose
+	var destination: Variant = _teleport.update(inputs)
+	if destination is Vector3:
+		_tracking.position += Teleport.room_shift(destination, to_local(_tracking.head_position()))
+		_sweep.reset_tracking()
+	_landing.visible = _teleport.landing is Vector3
+	_teleport_beam.hide()
 	if _landing.visible:
-		_landing.position = _teleport_target + Vector3.UP * 0.007
+		_landing.position = _teleport.landing + Vector3.UP * 0.007
+		var ray: Transform3D = inputs[_teleport.active_hand].pose
+		var travel := _landing.position - ray.origin
+		_draw_beam(_teleport_beam, ray.origin, travel.normalized(), travel.length())
 
 
 func _setup_failed(message: String) -> void:
@@ -377,7 +386,7 @@ func _process(delta: float) -> void:
 	if strike_landed:
 		_strike_audio.play_strike(session.billet, _sweep.last_contact)
 	var severed := _refresh(false)
-	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
+	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s\nPush either stick forward, aim at the floor and release to teleport" % [
 		"Point and trigger, or grip a nearby tool" if _tools.held < 0 and _left_tools.held < 0 else "Tool held",
 		session.strikes, severed, session.step_ms, Engine.get_frames_per_second(),
 		"Billet held · bring it into the fire to heat" if _grab.held else "Grip the billet or point and trigger to pick it up"]

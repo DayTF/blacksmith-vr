@@ -20,9 +20,36 @@ func run() -> PackedStringArray:
 	var head := Vector3(1.0, 0.7, 2.0)
 	if not (head + Teleport.room_shift(floor, head)).is_equal_approx(Vector3(floor.x, head.y, floor.z)):
 		failures.append("Teleport must preserve height and account for tracked headset offset.")
+	_test_teleport_input(ray, floor, failures)
 	_test_tools(failures)
 	_test_fingers(failures)
 	return failures
+
+
+func _test_teleport_input(ray: Transform3D, floor: Vector3, failures: PackedStringArray) -> void:
+	var control := Teleport.new()
+	var right := {"pose": ray.looking_at(floor), "stick": Vector2(0.0, 0.8), "click": false}
+	if control.update([right, {}]) != null or not control.landing is Vector3 or control.active_hand != 0:
+		failures.append("A right-stick forward gesture must show a landing before moving.")
+	right.pose = ray
+	right.stick = Vector2.ZERO
+	var destination: Variant = control.update([right, {}])
+	if not destination is Vector3 or not destination.is_equal_approx(floor) or control.landing != null:
+		failures.append("Releasing the right stick must use the last visible landing instead of re-aiming.")
+	if control.update([right, {}]) != null:
+		failures.append("Holding the stick neutral must not teleport again.")
+	var left := {"pose": ray.looking_at(floor), "stick": Vector2.ZERO, "click": true}
+	control.update([{}, left])
+	if not control.landing is Vector3 or control.active_hand != 1:
+		failures.append("The left stick click must also start aiming.")
+	if control.update([{}, {}]) != null or control.landing != null:
+		failures.append("Tracking loss must cancel an active teleport.")
+	control.update([{}, left])
+	left.pose = ray.looking_at(Vector3(0.05, Teleport.FLOOR, 0.0))
+	control.update([{}, left])
+	left.click = false
+	if control.update([{}, left]) != null:
+		failures.append("An obstructed aim must clear the landing before release.")
 
 
 func _test_tools(failures: PackedStringArray) -> void:
