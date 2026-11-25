@@ -2,6 +2,7 @@
   "grip_to_face_m": [0, -0.04, -0.15],
   "anvil_height_m": 0.9,
   "anvil_friction_coefficient": 0.45,
+  "hammer_impulse_transfer": 0.20,
   "maximum_density_multiplier": 1.25,
   "anvil_reach_m": 0.6,
   "maximum_sample_gap_s": 0.1,
