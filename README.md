@@ -147,3 +147,13 @@ For the placement preview, move your left controller close to the billet and
 squeeze its grip. Lift or turn the piece, then release the grip over the anvil.
 With optical hand input, pinch using your left thumb and index finger.
 The preview resumes forging when you release the billet.
+
+## Forge room study
+
+Open `scenes/forge_room_study.tscn` and press **F6** for the fixed desktop
+view. The room shell contains the forge, anvil, side quench tank and wall
+rack. Equipment and tracked interactions are developed separately.
+[Desktop capture](docs/previews/forge-room-study.png)
+
+The checked-in GLB can be rebuilt with
+`blender --background --python assets/forge_room/build_room.py`.

@@ -923,3 +923,16 @@ outside the selected connected component.
 
 Headless tests cover both mechanics backends. Steam Frame controller
 binding, placement feel and headset performance remain hardware checks.
+
+## Forge room shell study (#63)
+
+`scenes/forge_room_study.tscn` is a fixed-view desktop study of the 4 × 6 m
+room. The PBR GLB places the forge at the back, anvil near the center, quench
+tank at the side, tool rack along the wall and the camera at the front.
+Godot provides six room lights. CI imports and loads the scene.
+
+The GLB comes from `assets/forge_room/build_room.py`, tested in Blender 2.93.5.
+Regenerate it with `blender --background --python assets/forge_room/build_room.py`.
+The room study uses static coal and liquid references. Equipment behavior,
+XR room integration, localized effects and audio stay in #16. M2 remains
+open pending the M1 hardware interaction and timing checks.

@@ -1,0 +1,66 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/forge_room/forge_room.glb" id="1_room"]
+
+[sub_resource type="Environment" id="Environment_room"]
+background_mode = 1
+background_color = Color(0.022, 0.029, 0.042, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.65, 0.74, 0.91, 1)
+ambient_light_energy = 0.46
+tonemap_mode = 3
+glow_enabled = true
+glow_intensity = 0.35
+
+[node name="ForgeRoomStudy" type="Node3D"]
+
+[node name="Room" parent="." instance=ExtResource("1_room")]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_room")
+
+[node name="FrontView" type="Camera3D" parent="."]
+position = Vector3(-0.14, 1.62, 2.78)
+rotation_degrees = Vector3(-11, -3, 0)
+current = true
+fov = 66.0
+near = 0.03
+far = 25.0
+
+[node name="HearthLight" type="OmniLight3D" parent="."]
+position = Vector3(-0.49, 1.21, -1.89)
+light_color = Color(1, 0.41, 0.16, 1)
+light_energy = 2.2
+omni_range = 3.4
+omni_attenuation = 1.5
+
+[node name="AnvilKey" type="OmniLight3D" parent="."]
+position = Vector3(-0.60, 2.65, 0.15)
+light_color = Color(1, 0.78, 0.53, 1)
+light_energy = 2.4
+shadow_enabled = true
+omni_range = 4.1
+
+[node name="StockBenchFill" type="OmniLight3D" parent="."]
+position = Vector3(-1.56, 2.06, 0.42)
+light_color = Color(0.71, 0.78, 1, 1)
+light_energy = 0.78
+omni_range = 2.6
+
+[node name="TankFill" type="OmniLight3D" parent="."]
+position = Vector3(1.27, 1.77, -0.79)
+light_color = Color(0.43, 0.72, 1, 1)
+light_energy = 0.95
+omni_range = 2.4
+
+[node name="ToolRackLight" type="OmniLight3D" parent="."]
+position = Vector3(1.48, 2.1, 0.36)
+light_color = Color(1, 0.71, 0.43, 1)
+light_energy = 0.85
+omni_range = 2.6
+
+[node name="DoorwayFill" type="OmniLight3D" parent="."]
+position = Vector3(0.11, 2.42, 2.58)
+light_color = Color(0.63, 0.76, 1, 1)
+light_energy = 0.95
+omni_range = 4.4

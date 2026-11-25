@@ -123,3 +123,12 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/native-xr.log"; then
             exit 1
           fi
+
+      - name: Load the Blender forge room study
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 2>&1 | tee "$RUNNER_TEMP/forge-room.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/forge-room.log"; then
+            exit 1
+          fi
