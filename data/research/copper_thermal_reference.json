@@ -1,0 +1,44 @@
+{
+  "name": "Solid copper thermal reference",
+  "scope": "Research-only comparison at residual-resistivity ratio 100. The selected ratio is an example, not a certified stock condition.",
+  "conductivity_source": {
+    "url": "https://doi.org/10.6028/NBS.IR.84-3007",
+    "location": "Section 2.4, Table 2.4.1, RRR 100 column",
+    "kind": "Calculated reference correlation"
+  },
+  "specific_heat_source": {
+    "url": "https://webbook.nist.gov/cgi/inchi?ID=C7440508&Table=on&Type=JANAFS",
+    "location": "Solid copper Shomate relation",
+    "kind": "Sampled reference correlation",
+    "molar_mass_kg_per_mol": 0.063546
+  },
+  "valid_temperature_c": [26.85, 1026.85],
+  "curves": {
+    "thermal_conductivity": {
+      "axis": "temperature",
+      "unit": "W/(m K)",
+      "interpolation": "linear",
+      "keys": [
+        [26.85, 397],
+        [226.85, 385],
+        [426.85, 372],
+        [626.85, 359],
+        [826.85, 347],
+        [1026.85, 337]
+      ]
+    },
+    "specific_heat": {
+      "axis": "temperature",
+      "unit": "J/(kg K)",
+      "interpolation": "linear",
+      "keys": [
+        [26.85, 385.317092],
+        [226.85, 408.932667],
+        [426.85, 425.151069],
+        [626.85, 440.208754],
+        [826.85, 463.844943],
+        [1026.85, 506.371177]
+      ]
+    }
+  }
+}
