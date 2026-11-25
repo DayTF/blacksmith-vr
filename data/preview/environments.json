@@ -6,5 +6,6 @@
     {"id": "water", "name": "Water quench · 20 °C", "temperature_c": 20, "coefficient_property": "quench_water", "coefficient_scale": 1},
     {"id": "oil", "name": "Oil quench · 20 °C", "temperature_c": 20, "coefficient_property": "quench_oil", "coefficient_scale": 1}
   ],
+  "anvil_contact": {"temperature_c": 20, "contact_conductance_w_m2k": 300},
   "capture_duration_s": 6
 }

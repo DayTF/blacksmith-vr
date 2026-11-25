@@ -36,8 +36,14 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 			return _fail("Invalid thermal contact.")
 		var areas: PackedFloat64Array = contact.areas
 		var boundary: Dictionary = contact.boundary
-		if areas.size() != nodes.size() or not _number(boundary.get("temperature_c")) or not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
+		if areas.size() != nodes.size() or not _number(boundary.get("temperature_c")):
 			return _fail("Invalid thermal boundary or exposure array.")
+		var fixed: Variant = boundary.get("contact_conductance_w_m2k")
+		if fixed != null:
+			if not _number(fixed) or fixed < 0.0:
+				return _fail("Invalid solid contact conductance.")
+		elif not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
+			return _fail("Invalid boundary transfer coefficient.")
 		for area in areas:
 			if not _number(area) or area < 0.0:
 				return _fail("Invalid thermal exposure area.")
@@ -49,7 +55,7 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 		if ambient < -float(tuning.kelvin_offset):
 			return _fail("Thermal boundary is below absolute zero.")
 		boundaries.append({"areas": areas, "temperature": ambient,
-			"property": boundary.coefficient_property, "scale": boundary.coefficient_scale})
+			"property": boundary.get("coefficient_property", ""), "scale": boundary.get("coefficient_scale", 1.0), "fixed": fixed})
 	var temperatures := PackedFloat64Array()
 	var strains := PackedFloat64Array()
 	for index in nodes.size():
@@ -100,16 +106,21 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 			var tk: float = temperatures[index] + tuning.kelvin_offset
 			var net_power := 0.0
 			for boundary in boundaries:
-				var property: String = boundary.property
-				if not properties.has(property):
-					var coefficient: Variant = materials.sample(nodes[index].material_id, property, state)
-					if not _number(coefficient) or coefficient < 0.0:
-						return _fail("Invalid thermal curve: " + property)
-					properties[property] = float(coefficient)
-				var ak: float = boundary.temperature + tuning.kelvin_offset
-				# Factor the fourth-power difference into a frozen conductance.
-				var radiation: float = properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
-				var g: float = boundary.areas[index] * (properties[property] * boundary.scale + radiation)
+				var transfer: float
+				if boundary.fixed != null:
+					transfer = float(boundary.fixed)
+				else:
+					var property: String = boundary.property
+					if not properties.has(property):
+						var coefficient: Variant = materials.sample(nodes[index].material_id, property, state)
+						if not _number(coefficient) or coefficient < 0.0:
+							return _fail("Invalid thermal curve: " + property)
+						properties[property] = float(coefficient)
+					var ak: float = boundary.temperature + tuning.kelvin_offset
+					# Factor the fourth-power difference into a frozen conductance.
+					var radiation: float = properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
+					transfer = properties[property] * boundary.scale + radiation
+				var g: float = boundary.areas[index] * transfer
 				if not is_finite(g):
 					return _fail("Nonfinite thermal boundary conductance.")
 				totals[index] += g

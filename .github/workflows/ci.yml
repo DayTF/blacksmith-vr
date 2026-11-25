@@ -113,6 +113,8 @@ jobs:
           python3 tools/prepare_preview.py --xr
           godot --headless --xr-mode off --path .build/xr-preview --editor --import --quit
           godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/tracked-preview.log"
+          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-bath-smoke 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
+          grep -q 'Tracked bath ready: water' "$RUNNER_TEMP/tracked-preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/tracked-preview.log"; then
             exit 1
           fi
@@ -125,6 +127,8 @@ jobs:
           godot --headless --xr-mode off --path .build/xr-preview-native --editor --import --quit
           godot --headless --xr-mode off --path .build/xr-preview-native -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/native-xr.log"
           grep -q 'Tracked preview ready: 84 points, native' "$RUNNER_TEMP/native-xr.log"
+          godot --headless --xr-mode off --path .build/xr-preview-native -- --tracked-bath-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/native-xr.log"
+          grep -q 'Tracked bath ready: oil' "$RUNNER_TEMP/native-xr.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/native-xr.log"; then
             exit 1
           fi

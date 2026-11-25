@@ -2,12 +2,17 @@ extends "res://src/game/billet_preview.gd"
 
 const WorldTools = preload("res://src/vr/world_tool_grip.gd")
 const Teleport = preload("res://src/vr/forge_teleport.gd")
+const ThermalContacts := preload("res://src/game/forge_thermal_contacts.gd")
 const Room = preload("res://scenes/forge_room_study.tscn")
 const NativeBillet = preload("res://src/sim/native_granular_billet.gd")
 const BilletGrab = preload("res://src/sim/billet_grab.gd")
 const TrackedHammer = preload("res://src/sim/tracked_hammer.gd")
 const HammerTracking = preload("res://src/vr/hammer_tracking.gd")
 
+var _room: Node3D
+var _thermal_contacts: RefCounted
+var _boundaries := {}
+var _peak_cooling := PackedFloat64Array()
 var _tracking: XROrigin3D
 var _sweep := TrackedHammer.new()
 var _grab := BilletGrab.new()
@@ -54,6 +59,10 @@ func _ready() -> void:
 	session.config.emission_scale = _settings.render_emission_scale
 	_show_wire = "--show-billet-lattice" in OS.get_cmdline_user_args()
 	_build_room()
+	_thermal_contacts = ThermalContacts.new(JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json")))
+	for boundary: Dictionary in session.environments.environments:
+		_boundaries[boundary.id] = boundary
+	_boundaries["anvil"] = session.environments.anvil_contact
 	_build_strike_audio()
 	_add_hammer_handle()
 	_build_tools()
@@ -65,8 +74,14 @@ func _ready() -> void:
 	canvas.add_child(_status)
 	_refresh(false)
 	_update_tools(0.0, {})
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--tracked-bath-capture="):
+			_run_bath_smoke(argument.trim_prefix("--tracked-bath-capture="))
+			return
 	if DisplayServer.get_name() == "headless":
-		if "--tracked-preview-smoke" in OS.get_cmdline_user_args():
+		if "--tracked-bath-smoke" in OS.get_cmdline_user_args():
+			_run_bath_smoke()
+		elif "--tracked-preview-smoke" in OS.get_cmdline_user_args():
 			if session.strikes != 0 or _tools.held >= 0 or _tools.tools.size() != 2 or not session.billet.step(session.config.step_s):
 				_setup_failed("Tracked fixture failed its initial mechanics step.")
 				return
@@ -89,12 +104,12 @@ func _ready() -> void:
 
 
 func _build_room() -> void:
-	var room: Node3D = Room.instantiate()
-	room.position = Vector3(0.0, Teleport.FLOOR, 0.18)
-	var study_camera := room.get_node("FrontView")
-	room.remove_child(study_camera)
+	_room = Room.instantiate()
+	_room.position = Vector3(0.0, Teleport.FLOOR, 0.18)
+	var study_camera := _room.get_node("FrontView")
+	_room.remove_child(study_camera)
 	study_camera.free()
-	add_child(room)
+	add_child(_room)
 	_build_visuals()
 
 
@@ -220,7 +235,7 @@ func _process(delta: float) -> void:
 		_sweep.reset_tracking()
 	var started := Time.get_ticks_usec()
 	if not _grab.held:
-		if not session.billet.step(session.config.step_s) or not session.purification.apply(session.billet):
+		if not _step_released_billet() or not session.purification.apply(session.billet):
 			session.errors.append_array(session.billet.errors)
 			session.errors.append_array(session.purification.errors)
 			_fail()
@@ -242,6 +257,105 @@ func _process(delta: float) -> void:
 		print("Tracked preview: ", _status.text.replace("\n", "  "))
 
 
+func _support_height(point: Vector3) -> float:
+	return _room.position.y + ThermalContacts.support_height(point - _room.position)
+
+
+func _step_released_billet() -> bool:
+	# The preview kernel has one flat support plane. Use the highest support
+	# under the billet's footprint so a piece spanning an edge stays supported.
+	var support: float = Teleport.FLOOR
+	for point: Dictionary in session.billet.nodes:
+		support = maxf(support, _support_height(point.position))
+	session.billet.tuning.anvil_height_m = support
+	return session.billet.step(session.config.step_s)
+
+
+func _physics_process(delta: float) -> void:
+	if _tracking == null:
+		return
+	if not _step_thermal(delta):
+		_fail()
+		set_process(false)
+		set_physics_process(false)
+
+
+func _step_thermal(delta: float) -> bool:
+	var areas: Dictionary = _thermal_contacts.areas_by_station(session.billet, _room.transform.affine_inverse())
+	if areas.is_empty():
+		session.errors.append_array(_thermal_contacts.errors)
+		return false
+	var contacts: Array[Dictionary] = []
+	for station: String in areas:
+		var boundary: String = _room.quench_medium() if station == "bath" else station
+		contacts.append({"areas": areas[station], "boundary": _boundaries[boundary]})
+	if not session.thermal.step_with_boundaries(session.billet.nodes, session.billet.connections, contacts, delta):
+		session.errors.append_array(session.thermal.errors)
+		return false
+	session.phase_count += session.thermal.phase_events.size()
+	_peak_cooling.resize(session.billet.nodes.size())
+	var wet_area := 0.0
+	var cooling := 0.0
+	for index in _peak_cooling.size():
+		_peak_cooling[index] = maxf(_peak_cooling[index], session.thermal.peak_cooling_rate_c_s[index])
+		var area: float = areas.bath[index]
+		wet_area += area
+		cooling += area * maxf(0.0, -session.thermal.mean_temperature_rate_c_s[index])
+	_room.set_quench_intensity(clampf(cooling / (wet_area * 340.0), 0.0, 1.0) if wet_area > 0.0 else 0.0)
+	return true
+
+
+func _run_bath_smoke(capture_path := "") -> void:
+	var nodes: Array[Dictionary] = session.billet.nodes
+	var grip := Transform3D(Basis.IDENTITY, nodes[0].position)
+	var bath := ThermalContacts.BATH
+	var submerged := bath.get_center()
+	submerged.y = bath.end.y - 0.05
+	grip.origin = _room.position + submerged
+	var initial := Transform3D(Basis.IDENTITY, nodes[0].position)
+	if not _grab.acquire(session.billet, initial, _settings.grab_reach_m, _support_height) \
+			or not _grab.move(grip, _support_height) or not _step_thermal(session.config.step_s):
+		_setup_failed("Tracked bath fixture could not cool a held billet.")
+		return
+	var held_temperature: float = session.summary().temperature_mean
+	var held_height: float = nodes[0].position.y
+	_grab.release()
+	if not _step_released_billet() or session.billet.nodes[0].position.y >= held_height:
+		_setup_failed("Released billet did not begin falling under gravity.")
+		return
+	for frame in 35:
+		if not _step_released_billet() or not _step_thermal(session.config.step_s):
+			_setup_failed("Tracked bath fixture could not settle: " + str(session.billet.errors) + str(session.errors))
+			return
+	var floor := _room.position.y + bath.position.y
+	var lowest := INF
+	for point: Dictionary in session.billet.nodes:
+		lowest = minf(lowest, point.position.y)
+	if absf(lowest - floor) > 0.001 or not held_temperature < session.temperature \
+			or not session.summary().temperature_mean < held_temperature or _peak_cooling[0] <= 0.0:
+		_setup_failed("Released billet failed to settle and cool at the bath floor.")
+		return
+	print("Tracked bath ready: ", _room.quench_medium(), " · ", lowest, " m")
+	if not capture_path.is_empty():
+		var camera := Camera3D.new()
+		camera.position = _room.position + Vector3(0.60, 1.49, -0.51)
+		add_child(camera)
+		camera.look_at(_room.position + bath.get_center())
+		camera.fov = 40.0
+		camera.make_current()
+		_status.hide()
+		_refresh(false)
+		for frame in 18:
+			await RenderingServer.frame_post_draw
+		var result := get_viewport().get_texture().get_image().save_png(capture_path)
+		_room.queue_free()
+		for frame in 4:
+			await get_tree().process_frame
+		get_tree().quit(result)
+		return
+	get_tree().quit()
+
+
 func _update_grab() -> void:
 	var sample: Dictionary = _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
 	var source: String = sample.get("source", "")
@@ -261,12 +375,12 @@ func _update_grab() -> void:
 		return
 	var local_pose: Transform3D = global_transform.affine_inverse() * sample.pose
 	if _grab.held:
-		if not _grab.move(local_pose):
+		if not _grab.move(local_pose, _support_height):
 			_grab.release()
 			_sweep.reset_tracking()
 	elif _grab_armed and pressure >= _settings.grab_press:
 		_grab_armed = false
-		if _grab.acquire(session.billet, local_pose, _settings.grab_reach_m):
+		if _grab.acquire(session.billet, local_pose, _settings.grab_reach_m, _support_height):
 			_sweep.reset_tracking()
 
 

@@ -23,6 +23,7 @@ func run() -> PackedStringArray:
 	_test_exposure()
 	_test_cooling_rates()
 	_test_simultaneous_boundaries()
+	_test_solid_contact()
 	return failures
 
 
@@ -175,3 +176,12 @@ func _test_simultaneous_boundaries() -> void:
 	_expect(not model.step_with_boundaries(nodes, _no_links, contacts, 0.02),
 		"Invalid contact area rejects the entire step")
 	_expect(before == nodes, "Failed mixed contact leaves every point unchanged")
+
+func _test_solid_contact() -> void:
+	var model := _model(_fixture({"emissivity": 1.0}))
+	var nodes: Array[Dictionary] = [_node(100.0), _node(100.0)]
+	var boundary := {"temperature_c": 20.0, "contact_conductance_w_m2k": 300.0}
+	_expect(model.step(nodes, _no_links, PackedFloat64Array([0.2, 0]), 0.02, boundary),
+		"Cold solid contact advances")
+	_near(nodes[0].temperature, 90.4, 1e-8, "Anvil contact transfers heat across the contact area")
+	_near(nodes[1].temperature, 100.0, 1e-8, "Anvil exchange does not reach a separated point")

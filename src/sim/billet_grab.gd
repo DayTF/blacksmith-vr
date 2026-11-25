@@ -12,7 +12,7 @@ var _points := {}
 var _directions := {}
 
 
-func acquire(billet: RefCounted, grip: Transform3D, radius: float) -> bool:
+func acquire(billet: RefCounted, grip: Transform3D, radius: float, support := Callable()) -> bool:
 	if held or not _valid_grip(grip) or not is_finite(radius) or radius <= 0.0:
 		return false
 	var nodes: Array[Dictionary] = billet.nodes
@@ -39,31 +39,31 @@ func acquire(billet: RefCounted, grip: Transform3D, radius: float) -> bool:
 			_directions[id] = link.reference_direction
 	_initial_pose = grip.orthonormalized()
 	_billet = billet
-	if move(grip):
+	if move(grip, support):
 		return true
 	release()
 	return false
 
 
-func move(grip: Transform3D) -> bool:
+func move(grip: Transform3D, support := Callable()) -> bool:
 	if not held or not _valid_grip(grip):
 		return false
 	var delta := grip.orthonormalized() * _initial_pose.inverse()
-	var lower := INF
+	var lift := 0.0
 	var positions := {}
 	for id in _points:
 		var position: Vector3 = delta * _points[id][0]
 		if not position.is_finite():
 			return false
 		positions[id] = position
-		lower = minf(lower, position.y)
-	var lift := maxf(0.0, _billet.tuning.anvil_height_m - lower)
+		var height: float = support.call(position) if support.is_valid() else _billet.tuning.anvil_height_m
+		lift = maxf(lift, height - position.y)
 	if not is_finite(lift):
 		return false
 	var nodes: Array[Dictionary] = _billet.nodes
 	for id in _points:
 		var position: Vector3 = positions[id]
-		position.y = maxf(position.y + lift, _billet.tuning.anvil_height_m)
+		position.y += lift
 		nodes[id].position = position
 		nodes[id].velocity = Vector3.ZERO
 		nodes[id].orientation = delta.basis * _points[id][1]
