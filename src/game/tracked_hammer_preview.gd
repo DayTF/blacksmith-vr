@@ -41,6 +41,9 @@ func _ready() -> void:
 	session.billet.tuning.anvil_friction_coefficient = _settings.anvil_friction_coefficient
 	session.billet.tuning.maximum_density_multiplier = _settings.maximum_density_multiplier
 	_stage_floor_y = -_settings.anvil_height_m
+	_rounding_radius = _settings.render_corner_radius_m
+	session.config.emission_scale = _settings.render_emission_scale
+	_show_wire = "--show-billet-lattice" in OS.get_cmdline_user_args()
 	_build_stage()
 	_add_hammer_handle()
 	_cache_faces()
