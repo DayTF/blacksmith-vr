@@ -1197,3 +1197,11 @@ Held and released props use swept bounds against the hearth, cap, side bricks,
 rear lining, hood and flue. The front opening allows insertion and removal.
 Tools released in the hearth fall onto its floor. The collision sizes follow
 `assets/forge_room/build_room.py`. Keep these aligned when editing the forge.
+
+## Working billet pickup (#117)
+
+Use either hand to grip the live billet at close range or point at it and hold
+the trigger. Carry it into the forge opening to heat it. Release the trigger
+or grip to set it down. The small hot blanks already in the hearth are loose
+stock props. A synthetic interaction fixture checks right-trigger pickup,
+measurable heating, release and left-grip pickup without headset hardware.

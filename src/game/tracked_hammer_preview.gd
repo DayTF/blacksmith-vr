@@ -18,8 +18,7 @@ var _boundaries := {}
 var _tracking: XROrigin3D
 var _sweep := TrackedHammer.new()
 var _grab := BilletGrab.new()
-var _grab_armed := false
-var _grab_source := ""
+var _billet_tool := -1
 var _xr: XRInterface
 var _settings: Dictionary
 var _face_offset: Vector3
@@ -155,6 +154,9 @@ func _build_tools() -> void:
 	]
 
 	_tools.tools.append_array(PropInventory.register(_room, self))
+	_billet_tool = _tools.tools.size()
+	_tools.tools.append({"name": "Working billet", "kind": "billet", "pose": Transform3D.IDENTITY,
+		"aim_bounds": AABB(), "reach_m": _settings.billet_grab_reach_m})
 	_left_tools.tools = _tools.tools
 	_tools.pose_filter = _constrain_tool
 	_left_tools.pose_filter = _constrain_tool
@@ -198,9 +200,12 @@ func _build_landing_marker() -> void:
 
 
 func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
+	_update_billet_pickup_bounds()
 	_update_tool_hand(0, _tools, _left_tools.held, right, delta)
 	_update_tool_hand(1, _left_tools, _tools.held, left, delta)
-	for index in _tools.tools.size():
+	if _grab.held and _tools.held != _billet_tool and _left_tools.held != _billet_tool:
+		_grab.release()
+	for index in _billet_tool:
 		var tool := _tools.tools[index]
 		var pose: Transform3D = tool.pose
 		if index == _tools.held or index == _left_tools.held:
@@ -212,7 +217,7 @@ func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
 			tool.fall += delta * 9.81
 			var desired := pose
 			desired.origin.y = maxf(minf(support, pose.origin.y), pose.origin.y - tool.fall * delta)
-			var settled := _constrain_tool(tool, desired)
+			var settled: Transform3D = _constrain_tool(tool, desired)
 			if settled.origin.y > desired.origin.y or settled.origin.y <= support:
 				tool.fall = 0.0
 			pose = settled
@@ -220,7 +225,34 @@ func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
 		tool.mesh.transform = pose.translated_local(tool.offset)
 
 
-func _constrain_tool(tool: Dictionary, desired: Transform3D, remote := false) -> Transform3D:
+func _update_billet_pickup_bounds() -> void:
+	var bounds := AABB(session.billet.nodes[0].position, Vector3.ZERO)
+	for node: Dictionary in session.billet.nodes:
+		bounds = bounds.expand(node.position)
+	var proxy: Dictionary = _tools.tools[_billet_tool]
+	proxy.pose = Transform3D(Basis.IDENTITY, bounds.get_center())
+	proxy.aim_bounds = AABB(-bounds.size * 0.5, bounds.size).grow(0.012)
+
+
+func _constrain_tool(tool: Dictionary, desired: Transform3D, remote := false,
+		acquiring := false) -> Variant:
+	if tool.kind == "billet":
+		var grip := desired
+		if remote or tool.get("remote_grip", false):
+			grip.origin -= grip.basis.z * _settings.remote_billet_offset_m
+		if acquiring:
+			_grab.release()
+			tool.remote_grip = remote
+			var anchor := grip
+			if remote:
+				anchor.origin = tool.pose.origin
+			var reach: float = tool.aim_bounds.size.length() if remote else _settings.billet_grab_reach_m + 0.024
+			if not _grab.acquire(session.billet, anchor, reach, _support_height):
+				return null
+		if not _grab.move(grip, _support_height):
+			_grab.release()
+			return null
+		return desired
 	var bounds := _tool_bounds(tool)
 	var room_from_stage := _room.transform.affine_inverse()
 	return _room.transform * ForgeMotion.constrain(bounds, room_from_stage * tool.pose,
@@ -317,9 +349,8 @@ func _process(delta: float) -> void:
 		return
 	_tracking.update_hands()
 	_update_teleport()
-	_update_grab()
 	var tool_hand: Dictionary = _tracking.tool_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
-	var left: Dictionary = {} if _grab.held else _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
+	var left: Dictionary = _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
 	_update_tools(delta, tool_hand, left)
 	var strike_landed := false
 	var hammer := _held_hammer()
@@ -349,7 +380,7 @@ func _process(delta: float) -> void:
 	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
 		"Point and trigger, or grip a nearby tool" if _tools.held < 0 and _left_tools.held < 0 else "Tool held",
 		session.strikes, severed, session.step_ms, Engine.get_frames_per_second(),
-		"Billet held · release left grip to place" if _grab.held else "Left grip near billet to pick up"]
+		"Billet held · bring it into the fire to heat" if _grab.held else "Grip the billet or point and trigger to pick it up"]
 	_frame_report += delta
 	if _frame_report >= 5.0:
 		_frame_report = 0.0
@@ -449,37 +480,6 @@ func _run_bath_smoke(capture_path := "") -> void:
 		get_tree().quit(result)
 		return
 	get_tree().quit()
-
-
-func _update_grab() -> void:
-	if _left_tools.held >= 0:
-		_grab_armed = false
-		return
-	var sample: Dictionary = _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
-	var source: String = sample.get("source", "")
-	if source != _grab_source:
-		_grab.release()
-		_sweep.reset_tracking()
-		_grab_armed = false
-		_grab_source = source
-	if sample.is_empty():
-		return
-	var pressure: float = sample.pressure
-	if pressure <= _settings.grab_release:
-		if _grab.held:
-			_grab.release()
-			_sweep.reset_tracking()
-		_grab_armed = true
-		return
-	var local_pose: Transform3D = global_transform.affine_inverse() * sample.pose
-	if _grab.held:
-		if not _grab.move(local_pose, _support_height):
-			_grab.release()
-			_sweep.reset_tracking()
-	elif _grab_armed and pressure >= _settings.grab_press:
-		_grab_armed = false
-		if _grab.acquire(session.billet, local_pose, _settings.grab_reach_m, _support_height):
-			_sweep.reset_tracking()
 
 
 func _unhandled_input(_event: InputEvent) -> void:

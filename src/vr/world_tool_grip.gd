@@ -46,18 +46,24 @@ func update(sample: Dictionary, reach: float, press: float, release: float, unav
 	elif _armed and pressure >= press:
 		_armed = false
 		if held < 0:
-			var nearest := reach * reach
+			var nearest := INF
 			for index in tools.size():
 				if index == unavailable:
 					continue
 				var distance := _distance_squared(tools[index], pose.origin)
-				if distance <= nearest:
+				var maximum: float = tools[index].get("reach_m", reach)
+				if distance <= maximum * maximum and distance <= nearest:
 					nearest = distance
 					held = index
 	if held >= 0:
 		var desired := pose.orthonormalized()
 		if pose_filter.is_valid():
-			desired = pose_filter.call(tools[held], desired, _remote and held != previous)
+			var filtered: Variant = pose_filter.call(tools[held], desired, _remote and held != previous, held != previous)
+			if filtered == null:
+				held = -1
+				_remote = false
+				return held != previous
+			desired = filtered
 		tools[held].pose = desired
 	return held != previous
 
