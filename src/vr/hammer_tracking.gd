@@ -70,10 +70,14 @@ func update_hands() -> void:
 	_left_proxy.visible = _left_models.visible and _left_models.get_child_count() == 0
 
 
-func aim() -> Dictionary:
-	if not _aim.get_has_tracking_data():
+func teleport_input(left: bool) -> Dictionary:
+	var controller := _off_controller if left else _controller
+	var aim_pose := _aim if left else _right_aim
+	if not controller.get_has_tracking_data() and not aim_pose.get_has_tracking_data():
 		return {}
-	return {"pose": _aim.global_transform, "stick": _aim.get_vector2(&"primary").y}
+	var pose := aim_pose.global_transform if aim_pose.get_has_tracking_data() else controller.global_transform
+	return {"pose": pose, "stick": controller.get_vector2(&"primary"),
+		"click": controller.is_button_pressed(&"primary_click")}
 
 
 func head_position() -> Vector3:

@@ -129,9 +129,8 @@ strike. The replay ends at the welding strike.
 2. Start SteamVR with your headset connected and select SteamVR as the active
    OpenXR runtime in SteamVR settings.
 3. Open `VR/project.godot` in Godot 4.7 Standard and press **F5**.
-4. Face the anvil in your play area. Raise the right controller or tracked
-   hand above the billet and swing down. The mirror window shows the tracking
-   source, hit count, simulation step time, and host FPS.
+4. Face the anvil, pick up a hammer, and swing at the billet. The mirror
+   window shows the hit count, simulation step time, and host FPS.
 
 The VR project uses a 30-point reference fixture when native libraries are unavailable.
 The initial grip offset is in `data/preview/tracked_hammer.json`. The fixture
@@ -146,11 +145,6 @@ your host, run `python3 tools/prepare_preview.py --xr --native` and open
 with 12.5 mm simulation spacing. Use `--xr` by itself to stage the smaller
 reference fixture in the same VR folder.
 
-For the placement preview, move your left controller close to the billet and
-squeeze its grip. Lift or turn the piece, then release the grip over the anvil.
-With optical hand input, pinch using your left thumb and index finger.
-The preview resumes forging when you release the billet.
-
 ## Forge room study
 
 Open `scenes/forge_room_study.tscn` and press **F6** for the fixed desktop
@@ -163,12 +157,13 @@ The checked-in GLB can be rebuilt with
 
 ### Interactive XR room controls
 
-- Walk physically in your tracked area. Push the **left thumbstick forward**
-  to aim a teleport. Release it when the floor marker is visible.
-- Squeeze the **right grip** near the hammer handle to pick it up. Open your
-  grip to release it. The tongs use the same pickup interaction.
-- The **left grip** still lifts and places the billet. With optical hand
-  tracking, use a thumb/index pinch for the corresponding grip.
+- Walk physically in your tracked area. Push either thumbstick forward or hold
+  its click, aim at clear floor, and release when the green marker appears.
+- Point your index finger and hold the trigger to bring the targeted object
+  into the aiming hand. Squeeze either grip for a nearby object. Optical hand
+  tracking uses a thumb/index pinch. Release to drop or place the object.
+- Pick up the live billet on the anvil and carry it through the forge opening
+  to heat it. The glowing blanks already in the hearth are loose stock props.
 
-The interactive room uses the same staged XR projects. In a freshly staged
-project, let Godot import the room GLB before running.
+Let Godot import the room assets when opening a freshly staged VR project.
+Steam Frame controller bindings and comfort still need a hardware pass.

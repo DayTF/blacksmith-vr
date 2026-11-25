@@ -933,15 +933,12 @@ The Windows Forward+ capture is in `docs/previews/rounded-xr-billet.png`.
 
 ## Tracked billet placement (#50)
 
-The XR preview acquires the nearest connected piece within 50 mm when the
-left grip crosses its press threshold. Optical hand tracking supplies a
-thumb/index pinch when available. Release and tracking-source changes
-drop the piece and invalidate the hammer sweep history. A new grip must
-first open after tracking reconnects. The carried lattice uses a rigid
-transform and preserves its shape. Room support limits placement and
-thermal exchange continues while held (#90).
-Release resumes gravity with zero carried velocity. Detached debris is
-outside the selected connected component.
+The XR preview grips a connected piece near either hand or retrieves it with
+the index pickup ray (#117). A new grip must first open after tracking
+reconnects. Release and tracking-source changes drop the piece and invalidate
+hammer sweep history. The carried lattice uses a rigid transform and preserves
+its shape. Room support limits placement and thermal exchange continues while
+held (#90). Release resumes gravity with zero carried velocity.
 
 Headless tests cover both mechanics backends. Steam Frame controller
 binding, placement feel and headset performance remain hardware checks.
@@ -980,22 +977,22 @@ are recorded under the new issues.
 ### Interactive XR room preview (#66–#68)
 
 The tracked preview instantiates the forge room and starts its OpenXR origin
-at the front. Physical walking uses ordinary headset tracking. Push the left
-thumbstick forward to aim and let it return to center to confirm the visible
-floor marker. The ray must remain in the room, miss station volumes, and land
-on clear floor. Teleport shifts the origin horizontally to align the head
-with the accepted marker and clears the hammer sweep.
+at the front. Physical walking uses ordinary headset tracking. Push either
+thumbstick forward or hold its click to aim (#118). Aim at clear floor and
+release to confirm the green marker. The ray must remain in the room and miss
+station volumes. The last displayed valid marker drives the release, and
+tracking loss cancels it. Teleport aligns the headset with the accepted marker
+horizontally and clears the hammer sweep.
 
 Joint-driven displays on both hands accept all available valid finger joints,
 whether provided by optical tracking or the native controller profile.
 Controller render models or simple grips are used without usable joint data.
 
-The hammer and a pair of tongs are separate world objects using a shared
-right-hand pickup state. A close grip or optical pinch picks up the nearest
-tool. Opening the grip or losing tracking releases it. A held hammer uses
-its tracked face trajectory, and release clears strike history. The left
-grip still handles billet placement. The tongs are a pick-up prop at this
-stage; they do not act on the billet. Hardware binding, feel, and comfort
+Both hands use the same pickup controls for tools and the live billet. Grips
+and optical pinches pick up nearby objects, and the index ray retrieves them
+with the trigger. Opening the grip or losing tracking releases the object. A
+held hammer uses its tracked face trajectory, and release clears strike
+history. The tongs are a loose tool prop. Hardware binding, feel, and comfort
 verification remain open in #66–#68.
 
 ## Quench tank surface presentation (#71)
