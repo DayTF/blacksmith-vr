@@ -990,3 +990,14 @@ shader. The room's `set_quench_medium(medium_id)` adapter accepts the existing
 Run `scenes/forge_room_study.tscn -- --room-oil` to inspect the oil preset.
 This preview flag selects an appearance. Equipment contact and tracked
 quenching remain part of #16.
+
+## Local station effects (#73)
+
+The shared room renders flames, embers and local smoke at the hearth and
+flickers the existing hearth light within the six-light budget. The tank
+effect receives normalized cooling intensity and renders a local steam plume
+and a short entry splash. In the desktop room study, use `-- --room-quench`
+to run a scripted hot bath through the existing thermal boundary. Combine
+it with `--room-oil` to inspect the oil fixture. The desktop fixture drives
+the effects from measured billet cooling. Tracked station contact remains
+in #16.
