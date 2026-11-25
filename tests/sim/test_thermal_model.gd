@@ -24,6 +24,7 @@ func run() -> PackedStringArray:
 	_test_cooling_rates()
 	_test_simultaneous_boundaries()
 	_test_solid_contact()
+	_test_equipment_curve()
 	return failures
 
 
@@ -188,3 +189,21 @@ func _test_solid_contact() -> void:
 		"Cold solid contact advances")
 	_near(nodes[0].temperature, 90.4, 1e-8, "Anvil contact transfers heat across the contact area")
 	_near(nodes[1].temperature, 100.0, 1e-8, "Anvil exchange does not reach a separated point")
+
+func _test_equipment_curve() -> void:
+	var model := _model(_fixture({"emissivity": 1.0}))
+	var nodes: Array[Dictionary] = [_node(100.0), _node(60.0)]
+	var areas := PackedFloat64Array([0.1, 0.1])
+	var equipment := {"temperature_c": 20.0, "include_radiation": false,
+		"coefficient_curve": {"axis": "temperature", "keys": [[60, 100], [100, 300]]}}
+	_expect(model.step(nodes, _no_links, areas, 0.02, equipment), "Equipment curves need no material transfer property")
+	_near(nodes[0].temperature, 95.2, 1e-8, "Hot point uses its own equipment coefficient")
+	_near(nodes[1].temperature, 59.2, 1e-8, "Cool point uses a different equipment coefficient")
+	_near(model.boundary_energy_j, -56.0, 1e-8, "Effective coefficients can exclude additional radiation")
+	var before := nodes.duplicate(true)
+	equipment.coefficient_curve = {"axis": "missing", "keys": [[20, 100], [100, 300]]}
+	_expect(not model.step(nodes, _no_links, areas, 0.02, equipment), "Equipment graphs reject unknown inputs")
+	_expect(nodes == before, "Bad equipment curve leaves prior state untouched")
+	equipment.coefficient_curve = {"constant": 10}
+	equipment.coefficient_property = "quench_water"
+	_expect(not model.step(nodes, _no_links, areas, 0.02, equipment), "Competing transfer sources are rejected")
