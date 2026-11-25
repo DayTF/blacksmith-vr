@@ -2,6 +2,7 @@ extends Node3D
 ## Scripted desktop fixture for the room's data-defined thermal boundaries.
 
 const PreviewSession := preload("res://src/game/preview_session.gd")
+const Contacts := preload("res://src/game/forge_thermal_contacts.gd")
 const COOLING_RATE_FOR_FULL_EFFECT := 340.0
 
 signal cooling_changed(intensity: float)
@@ -13,6 +14,7 @@ var _smoke := false
 var _initial_temperature := 0.0
 var _mean_temperature := 0.0
 var _simulated_seconds := 0.0
+var _contacts: Array[Dictionary] = []
 
 
 func start(boundary_id: String, smoke: bool, charge_center: Vector3) -> void:
@@ -49,6 +51,22 @@ func start(boundary_id: String, smoke: bool, charge_center: Vector3) -> void:
 	charge.mesh = shape
 	charge.position = charge_center
 	charge.rotation.y = PI * 0.5
+	var origin: Array = _session.config.origin_m
+	var model_center := Vector3(origin[0], origin[1], origin[2]) + shape.size * 0.5
+	var room_from_billet := charge.transform
+	room_from_billet.origin -= room_from_billet.basis * model_center
+	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json"))
+	var allocator := Contacts.new(tuning)
+	var areas := allocator.areas_by_station(_session.billet, room_from_billet)
+	if areas.is_empty():
+		charge.free()
+		_fail(allocator.errors)
+		return
+	for boundary: Dictionary in _session.environments.environments:
+		if boundary.id == "air":
+			_contacts.append({"boundary": boundary, "areas": areas.air})
+	var station := "forge" if _heating else "bath"
+	_contacts.append({"boundary": _session.boundary, "areas": areas[station]})
 	_metal.metallic = 0.62
 	_metal.roughness = 0.46
 	_metal.emission_enabled = true
@@ -58,8 +76,8 @@ func start(boundary_id: String, smoke: bool, charge_center: Vector3) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not _session.thermal.step(_session.billet.nodes, _session.billet.connections,
-			_session.exposed_areas, delta, _session.boundary):
+	if not _session.thermal.step_with_boundaries(_session.billet.nodes, _session.billet.connections,
+			_contacts, delta):
 		_fail(_session.thermal.errors)
 		return
 	var total := 0.0
