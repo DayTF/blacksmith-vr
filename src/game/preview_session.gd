@@ -43,12 +43,17 @@ var _last_sequence_strike := 0
 var _sequence_end_at := 0.0
 
 
-func initialize() -> bool:
+func initialize(material_id := "") -> bool:
 	config = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/billet.json"))
 	environments = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/environments.json"))
 	if not materials.load_directory("res://data/materials"):
 		errors = materials.errors
 		return false
+	if not material_id.is_empty():
+		if materials.get_material(material_id) == null:
+			errors.append("Unknown preview material: " + material_id)
+			return false
+		config.material_id = material_id
 	return reset(float(config.temperature_presets_c[0]))
 
 

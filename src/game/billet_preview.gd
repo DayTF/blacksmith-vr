@@ -56,7 +56,7 @@ func _ready() -> void:
 		get_viewport().set_disable_input(true)
 	if layered_replay:
 		session = LayeredSession.new()
-	if not session.initialize():
+	if not (session.initialize() if layered_replay else session.initialize(_requested_material())):
 		_fail()
 		return
 	if "--preview-cold" in OS.get_cmdline_user_args():
@@ -70,6 +70,13 @@ func _ready() -> void:
 	_build_ui()
 	_cache_faces()
 	_refresh()
+
+
+func _requested_material() -> String:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--preview-material="):
+			return argument.trim_prefix("--preview-material=")
+	return ""
 
 
 func _process(delta: float) -> void:
@@ -329,6 +336,17 @@ func _build_ui() -> void:
 	subtitle.modulate = Color("a6b8ca")
 	column.add_child(subtitle)
 	column.add_child(_status)
+	if not layered_replay:
+		var material_picker := OptionButton.new()
+		var ids: PackedStringArray = session.materials.material_ids()
+		for material_id in ids:
+			material_picker.add_item(session.materials.get_material(material_id).display_name)
+		material_picker.select(ids.find(session.config.material_id))
+		material_picker.item_selected.connect(func(index: int):
+			session.config.material_id = ids[index]
+			_restart(session.temperature)
+		)
+		column.add_child(material_picker)
 	for value: float in session.config.temperature_presets_c:
 		if layered_replay:
 			_presets.add_item("Hot weld" if value > 20 else "Cold comparison")
@@ -566,6 +584,7 @@ func _finish_capture() -> void:
 			session.errors.append("Nonfinite preview geometry.")
 			_fail()
 			return
+	print("Preview material: ", session.config.material_id)
 	print("Preview complete: ", result)
 	if not _capture_path.is_empty():
 		await RenderingServer.frame_post_draw

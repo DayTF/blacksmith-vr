@@ -35,7 +35,7 @@ func _ready() -> void:
 	if native and not ClassDB.class_exists("BlacksmithNativeCore"):
 		_setup_failed("The native mechanics library is unavailable in this staged preview.")
 		return
-	if not session.initialize():
+	if not session.initialize(_requested_material()):
 		_fail()
 		set_process(false)
 		return
@@ -86,6 +86,7 @@ func _ready() -> void:
 				return
 			print("Tracked preview ready: ", session.billet.nodes.size(), " points, ",
 				"native" if native else "reference")
+			print("Tracked material: ", session.billet.nodes[0].material_id)
 			get_tree().quit()
 		else:
 			set_process(false)
