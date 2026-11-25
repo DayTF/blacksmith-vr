@@ -53,14 +53,14 @@ jobs:
           cmake -S native -B .build/native -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build .build/native --parallel 2
           ctest --test-dir .build/native --output-on-failure
-          python3 tools/prepare_native_import.py
+          python3 tools/prepare_preview.py --validation-dir "$RUNNER_TEMP/blacksmith-validation"
 
       - name: Import project and check scripts
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . --editor --import --quit 2>&1 | tee "$RUNNER_TEMP/godot-import.log"
-          godot --headless --path . --script tests/check_scripts.gd 2>&1 | tee -a "$RUNNER_TEMP/godot-import.log"
+          godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --editor --import --quit 2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/check_scripts.gd 2>&1 | tee -a "$RUNNER_TEMP/godot-import.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-import.log"; then
             echo 'Godot reported import or script errors.' >&2
             exit 1
@@ -70,23 +70,23 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . --script tests/run_all.gd 2>&1 | tee "$RUNNER_TEMP/godot-tests.log"
+          godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/run_all.gd 2>&1 | tee "$RUNNER_TEMP/godot-tests.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-tests.log"; then
             echo 'Godot reported errors while running simulation suites.' >&2
             exit 1
           fi
 
       - name: Measure tracked fixture compression
-        run: godot --headless --path . --script tests/measure_tracked_compression.gd
+        run: godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/measure_tracked_compression.gd
 
       - name: Verify the sourced copper conduction coupon
-        run: godot --headless --path . --script tests/measure_copper_conduction.gd
+        run: godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/measure_copper_conduction.gd
 
       - name: Run the headless M0 forging replay
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . --script tests/forging_harness.gd > "$RUNNER_TEMP/forging-replay.log" 2>&1 || {
+          godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/forging_harness.gd > "$RUNNER_TEMP/forging-replay.log" 2>&1 || {
             cat "$RUNNER_TEMP/forging-replay.log"
             exit 1
           }
@@ -99,18 +99,18 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 tools/prepare_preview.py
-          godot --headless --path .build/preview --editor --import --quit
-          godot --headless --path .build/preview -- --preview-smoke --preview-cold --preview-before-strike 2>&1 | tee "$RUNNER_TEMP/preview-rest.log"
-          godot --headless --path .build/preview -- --preview-smoke --preview-purification 2>&1 | tee "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview -- --preview-smoke --preview-heat 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview -- --preview-smoke --preview-quench 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview res://scenes/layered_preview.tscn -- --preview-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview res://scenes/layered_preview.tscn -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview -- --preview-smoke --preview-cold --preview-before-strike --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          python3 tools/prepare_preview.py --desktop
+          godot --headless --path Desktop --editor --import --quit
+          godot --headless --path Desktop -- --preview-smoke --preview-cold --preview-before-strike 2>&1 | tee "$RUNNER_TEMP/preview-rest.log"
+          godot --headless --path Desktop -- --preview-smoke --preview-purification 2>&1 | tee "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop -- --preview-smoke --preview-heat 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop -- --preview-smoke --preview-quench 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop res://scenes/layered_preview.tscn -- --preview-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop res://scenes/layered_preview.tscn -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop -- --preview-smoke --preview-cold --preview-before-strike --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           grep -q 'Preview material: prototype_embersteel' "$RUNNER_TEMP/preview.log"
-          godot --headless --path .build/preview -- --preview-naming-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path Desktop -- --preview-naming-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           grep -q 'Named billet ready:' "$RUNNER_TEMP/preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/preview.log" "$RUNNER_TEMP/preview-rest.log"; then
             echo 'Godot reported desktop preview errors.' >&2
@@ -122,11 +122,11 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/prepare_preview.py --xr
-          godot --headless --xr-mode off --path .build/xr-preview --editor --import --quit
-          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/tracked-preview.log"
-          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-bath-smoke 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
+          godot --headless --xr-mode off --path VR --editor --import --quit
+          godot --headless --xr-mode off --path VR -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/tracked-preview.log"
+          godot --headless --xr-mode off --path VR -- --tracked-bath-smoke 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
           grep -q 'Tracked bath ready: water' "$RUNNER_TEMP/tracked-preview.log"
-          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
+          godot --headless --xr-mode off --path VR -- --tracked-preview-smoke --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
           grep -q 'Tracked material: prototype_embersteel' "$RUNNER_TEMP/tracked-preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/tracked-preview.log"; then
             exit 1
@@ -137,10 +137,10 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/prepare_preview.py --xr --native
-          godot --headless --xr-mode off --path .build/xr-preview-native --editor --import --quit
-          godot --headless --xr-mode off --path .build/xr-preview-native -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/native-xr.log"
+          godot --headless --xr-mode off --path VR --editor --import --quit
+          godot --headless --xr-mode off --path VR -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/native-xr.log"
           grep -q 'Tracked preview ready: 84 points, native' "$RUNNER_TEMP/native-xr.log"
-          godot --headless --xr-mode off --path .build/xr-preview-native -- --tracked-bath-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/native-xr.log"
+          godot --headless --xr-mode off --path VR -- --tracked-bath-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/native-xr.log"
           grep -q 'Tracked bath ready: oil' "$RUNNER_TEMP/native-xr.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/native-xr.log"; then
             exit 1
@@ -150,11 +150,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 2>&1 | tee "$RUNNER_TEMP/forge-room.log"
-          godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 -- --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
-          godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
-          godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
-          godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 120 -- --room-heat-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path Desktop res://scenes/forge_room_study.tscn --quit-after 4 2>&1 | tee "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path Desktop res://scenes/forge_room_study.tscn --quit-after 4 -- --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path Desktop res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path Desktop res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path Desktop res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 120 -- --room-heat-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
           grep -q 'Room heat ready:' "$RUNNER_TEMP/forge-room.log"
           grep -q 'Room quench ready: water' "$RUNNER_TEMP/forge-room.log"
           grep -q 'Room quench ready: oil' "$RUNNER_TEMP/forge-room.log"

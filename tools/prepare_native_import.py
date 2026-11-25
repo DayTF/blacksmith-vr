@@ -23,7 +23,7 @@ def register_extension(project, manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parents[1] / "VR")
     project = parser.parse_args().project.resolve()
     manifest = "res://native/blacksmith.gdextension"
     names = {"linux": "libblacksmith_native.so", "win32": "blacksmith_native.dll"}

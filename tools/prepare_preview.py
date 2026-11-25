@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage the desktop or OpenXR development preview."""
+"""Prepare the Desktop and VR Godot launch folders."""
 import argparse
 import shutil
 from pathlib import Path
@@ -7,33 +7,23 @@ from pathlib import Path
 from prepare_native_import import register_extension
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--xr", action="store_true", help="Stage the tracked hammer OpenXR fixture.")
-    parser.add_argument("--native", action="store_true", help="Stage the larger XR billet and built native extension.")
-    args = parser.parse_args()
-    if args.native and not args.xr:
-        parser.error("--native requires --xr")
-    xr = args.xr
-    root = Path(__file__).resolve().parent.parent
-    names = ("libblacksmith_native.so", "blacksmith_native.dll")
-    libraries = [root / "native/bin" / name for name in names]
-    libraries = [path for path in libraries if path.is_file()]
-    if args.native and not libraries:
-        parser.error("Build the native extension before staging the larger XR preview.")
-    folder = "xr-preview-native" if args.native else ("xr-preview" if xr else "preview")
-    target = root / ".build" / folder
+SHARED_DIRECTORIES = ("src/sim", "src/game", "src/vr", "data/materials", "data/sim",
+                      "data/preview", "scenes", "shaders", "assets/forge_room")
+MANIFEST = "native/blacksmith.gdextension"
+
+
+def prepare(root, target, libraries=(), *, xr=False, validation=False):
     target.mkdir(parents=True, exist_ok=True)
-    # Copy an explicit allow-list: no native extension, generated cache, credentials
-    # or developer files are needed to run the reference solver's small fixture.
-    for name in ("src/sim", "src/game", "src/vr", "data/materials", "data/sim", "data/preview", "scenes", "shaders"):
+    for name in SHARED_DIRECTORIES:
         shutil.copytree(root / name, target / name, dirs_exist_ok=True)
-    for name in ("project.godot", "icon.svg"):
-        shutil.copy2(root / name, target / name)
-    shutil.copytree(root / "assets/forge_room", target / "assets/forge_room", dirs_exist_ok=True)
+    if validation:
+        for name in ("tests", "data/research"):
+            shutil.copytree(root / name, target / name, dirs_exist_ok=True)
+    shutil.copy2(root / "icon.svg", target)
+    config = (root / "project.godot.in").read_text(encoding="utf-8")
+    mode = "VR" if xr else "Desktop"
+    config = config.replace('config/name="Blacksmith VR"', f'config/name="Blacksmith {mode}"')
     if xr:
-        project = target / "project.godot"
-        config = project.read_text()
         config = config.replace("res://scenes/billet_preview.tscn", "res://scenes/tracked_hammer_preview.tscn")
         config += ("\n[xr]\n\nopenxr/enabled=true\n"
                    "openxr/extensions/hand_tracking=true\n"
@@ -41,19 +31,51 @@ def main():
                    "openxr/extensions/hand_tracking_controller_data_source=true\n"
                    "openxr/extensions/render_model=true\n"
                    "shaders/enabled=true\n")
-        if args.native:
+        if libraries:
             config += "\n[blacksmith_preview]\n\nnative_solver=true\n"
-        project.write_text(config)
-    if args.native:
+    (target / "project.godot").write_text(config, encoding="utf-8")
+    if libraries:
         (target / "native/bin").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(root / "native/blacksmith.gdextension", target / "native")
+        shutil.copy2(root / MANIFEST, target / MANIFEST)
         for library in libraries:
             shutil.copy2(library, target / "native/bin")
-        register_extension(target, "res://native/blacksmith.gdextension")
-    print(f"Preview ready: {target / 'project.godot'}")
-    print("Open that project in Godot 4.7+ Standard and press F5.")
-    if not args.native:
-        print("This small fixture uses GDScript; no native build is required.")
+        register_extension(target, "res://" + MANIFEST)
+    else:
+        (target / MANIFEST).unlink(missing_ok=True)
+        registry = target / ".godot/extension_list.cfg"
+        if registry.exists():
+            entries = [entry for entry in registry.read_text().splitlines()
+                       if entry.strip() != "res://" + MANIFEST]
+            registry.write_text("".join(entry + "\n" for entry in entries))
+    print(f"Ready: {target / 'project.godot'}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--desktop", action="store_true", help="Refresh only Desktop.")
+    mode.add_argument("--xr", action="store_true", help="Refresh only VR using the reference solver unless --native is supplied.")
+    mode.add_argument("--validation-dir", type=Path, help="Stage a temporary full test project outside the repository.")
+    parser.add_argument("--native", action="store_true", help="Require a built native solver for VR.")
+    args = parser.parse_args()
+    root = Path(__file__).resolve().parent.parent
+    names = ("libblacksmith_native.so", "blacksmith_native.dll")
+    available = [root / "native/bin" / name for name in names if (root / "native/bin" / name).is_file()]
+    if args.desktop and args.native:
+        parser.error("--native applies to VR")
+    if (args.native or args.validation_dir) and not available:
+        parser.error("Build the native solver before requesting native staging.")
+    if args.validation_dir:
+        target = args.validation_dir.resolve()
+        if root == target or root in target.parents:
+            parser.error("The validation directory must be outside the repository.")
+        prepare(root, target, available, validation=True)
+        return
+    if not args.xr:
+        prepare(root, root / "Desktop")
+    if not args.desktop:
+        libraries = available if args.native or not args.xr else ()
+        prepare(root, root / "VR", libraries, xr=True)
 
 
 if __name__ == "__main__":

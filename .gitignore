@@ -11,5 +11,9 @@
 .build/
 native/bin/
 
+# Generated Godot launch folders
+/Desktop/
+/VR/
+
 # Python tooling bytecode
 __pycache__/
