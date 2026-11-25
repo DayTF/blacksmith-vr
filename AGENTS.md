@@ -1127,3 +1127,10 @@ The AISI 1045 source audit (#102) lives in
 Run `python3 tools/fetch_material_sources.py data/research/aisi_1045_sources.json --output <directory>`
 to retrieve and verify the original measurement files. Preserve material
 condition, test ranges and data limitations when deriving curves.
+
+The 1045 audit also contains the published rolled-and-normalized
+hot-compression fit (#104). Run `python3 tools/inspect_hot_flow_stress.py 1000 0.5 1`
+to inspect its flow stress in pascals. Inputs are Celsius, true strain and
+strain rate in reciprocal seconds. The evaluator refuses extrapolation.
+Its tests cross-check the published fitted curves. The fit stays in the
+research data and is distinct from the annealed NIST dataset.
