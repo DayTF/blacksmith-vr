@@ -1190,3 +1190,10 @@ coals and two glowing hearth blanks, in addition to the hammer and tongs by the
 anvil. The room shell and fixtures stay fixed. Loose stock and fuel are props.
 The live granular billet uses its own grip and thermal controls. The tracked
 preview smoke check verifies that the authored props register on room load.
+
+## Forge contact for tools (#116)
+
+Held and released props use swept bounds against the hearth, cap, side bricks,
+rear lining, hood and flue. The front opening allows insertion and removal.
+Tools released in the hearth fall onto its floor. The collision sizes follow
+`assets/forge_room/build_room.py`. Keep these aligned when editing the forge.

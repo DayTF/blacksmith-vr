@@ -1,6 +1,7 @@
 extends "res://src/game/billet_preview.gd"
 
 const IndexRay := preload("res://src/vr/index_pickup_ray.gd")
+const ForgeMotion := preload("res://src/game/forge_solid_motion.gd")
 const PropInventory := preload("res://src/game/forge_prop_inventory.gd")
 const WorldTools = preload("res://src/vr/world_tool_grip.gd")
 const Teleport = preload("res://src/vr/forge_teleport.gd")
@@ -134,17 +135,29 @@ func _build_tools() -> void:
 		arm.position = Vector3(side * 0.018, 0, -0.045)
 		arm.rotation.y = side * 0.08
 		tongs.add_child(arm)
+	var hammer_offset := _face_offset + Vector3.UP * 0.01
+	var hammer_bounds := _hammer.get_aabb()
+	for part in _hammer.get_children():
+		if part is MeshInstance3D:
+			hammer_bounds = hammer_bounds.merge(part.transform * part.get_aabb())
+	hammer_bounds.position += hammer_offset
+	var tong_bounds: AABB = tongs.get_child(0).transform * tongs.get_child(0).get_aabb()
+	for part in tongs.get_children():
+		tong_bounds = tong_bounds.merge(part.transform * part.get_aabb())
 	_tools.tools = [
 		{"name": "Hammer", "kind": "hammer", "pose": Transform3D(Basis.IDENTITY, Vector3(0.14, 0.045, 0.11)), "mesh": _hammer,
-			"offset": _face_offset + Vector3.UP * 0.01, "aim_offset": _face_offset, "impact_offset": _face_offset,
+			"offset": hammer_offset, "aim_offset": _face_offset, "impact_offset": _face_offset,
+			"collision_bounds": hammer_bounds,
 			"fall": 0.0, "clearance": 0.04},
 		{"name": "Tongs", "kind": "tongs", "pose": Transform3D(Basis.IDENTITY, Vector3(-0.15, 0.014, 0.11)), "mesh": tongs,
 			"offset": Vector3.ZERO, "aim_offset": Vector3.FORWARD * 0.045,
-			"aim_radius": 0.115, "fall": 0.0, "clearance": 0.008},
+			"aim_radius": 0.115, "fall": 0.0, "clearance": 0.008, "collision_bounds": tong_bounds},
 	]
 
 	_tools.tools.append_array(PropInventory.register(_room, self))
 	_left_tools.tools = _tools.tools
+	_tools.pose_filter = _constrain_tool
+	_left_tools.pose_filter = _constrain_tool
 	var shape := CylinderMesh.new()
 	shape.height = 1.0
 	shape.top_radius = 0.002
@@ -194,17 +207,28 @@ func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
 			tool.fall = 0.0
 			tool.anchored = false
 		elif not tool.get("anchored", false):
-			var clearance: float = tool.clearance
-			if tool.has("aim_bounds"):
-				var rotated: AABB = Transform3D(pose.basis, Vector3.ZERO) * tool.aim_bounds
-				clearance = -rotated.position.y
-			var support := _support_height(pose.origin) + clearance
+			var rotated: AABB = Transform3D(pose.basis, Vector3.ZERO) * _tool_bounds(tool)
+			var support := _support_height(pose.origin) - rotated.position.y
 			tool.fall += delta * 9.81
-			pose.origin.y = maxf(support, pose.origin.y - tool.fall * delta)
-			if pose.origin.y <= support:
+			var desired := pose
+			desired.origin.y = maxf(minf(support, pose.origin.y), pose.origin.y - tool.fall * delta)
+			var settled := _constrain_tool(tool, desired)
+			if settled.origin.y > desired.origin.y or settled.origin.y <= support:
 				tool.fall = 0.0
+			pose = settled
 			tool.pose = pose
 		tool.mesh.transform = pose.translated_local(tool.offset)
+
+
+func _constrain_tool(tool: Dictionary, desired: Transform3D, remote := false) -> Transform3D:
+	var bounds := _tool_bounds(tool)
+	var room_from_stage := _room.transform.affine_inverse()
+	return _room.transform * ForgeMotion.constrain(bounds, room_from_stage * tool.pose,
+		room_from_stage * desired, remote)
+
+
+func _tool_bounds(tool: Dictionary) -> AABB:
+	return tool.get("collision_bounds", tool.get("aim_bounds"))
 
 
 func _update_tool_hand(hand: int, grip: RefCounted, unavailable: int, sample: Dictionary, delta: float) -> void:
