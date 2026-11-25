@@ -3,6 +3,7 @@ extends RefCounted
 
 var tools: Array[Dictionary] = []
 var held := -1
+var pose_filter: Callable
 var _source := ""
 var _armed := false
 var _trigger_armed := false
@@ -54,7 +55,10 @@ func update(sample: Dictionary, reach: float, press: float, release: float, unav
 					nearest = distance
 					held = index
 	if held >= 0:
-		tools[held].pose = pose.orthonormalized()
+		var desired := pose.orthonormalized()
+		if pose_filter.is_valid():
+			desired = pose_filter.call(tools[held], desired, _remote and held != previous)
+		tools[held].pose = desired
 	return held != previous
 
 func _distance_squared(tool: Dictionary, point: Vector3) -> float:
