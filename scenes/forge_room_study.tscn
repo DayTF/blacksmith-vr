@@ -1,6 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/forge_room/forge_room.glb" id="1_room"]
+
+[ext_resource type="Script" path="res://src/game/forge_room_study.gd" id="2_study"]
 
 [sub_resource type="Environment" id="Environment_room"]
 background_mode = 1
@@ -13,6 +15,7 @@ glow_enabled = true
 glow_intensity = 0.35
 
 [node name="ForgeRoomStudy" type="Node3D"]
+script = ExtResource("2_study")
 
 [node name="Room" parent="." instance=ExtResource("1_room")]
 
