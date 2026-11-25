@@ -11,6 +11,8 @@
   "render_corner_radius_m": 0.0035,
   "render_emission_scale": 0.24,
   "grab_reach_m": 0.05,
+  "billet_grab_reach_m": 0.10,
+  "remote_billet_offset_m": 0.09,
   "grab_press": 0.60,
   "grab_release": 0.40,
   "pinch_closed_m": 0.018,
