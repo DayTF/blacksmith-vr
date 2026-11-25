@@ -142,3 +142,8 @@ your host, run `python3 tools/prepare_preview.py --xr --native` and open
 `.build/xr-preview-native/project.godot`. This fixture is 37.5 × 25 × 75 mm
 with 12.5 mm simulation spacing. The regular `--xr` project remains available
 as the smaller, native-free fixture.
+
+For the placement preview, move your left controller close to the billet and
+squeeze its grip. Lift or turn the piece, then release the grip over the anvil.
+With optical hand input, pinch using your left thumb and index finger.
+The preview resumes forging when you release the billet.

@@ -1,11 +1,15 @@
 extends "res://src/game/billet_preview.gd"
 
 const NativeBillet = preload("res://src/sim/native_granular_billet.gd")
+const BilletGrab = preload("res://src/sim/billet_grab.gd")
 const TrackedHammer = preload("res://src/sim/tracked_hammer.gd")
 const HammerTracking = preload("res://src/vr/hammer_tracking.gd")
 
 var _tracking: XROrigin3D
 var _sweep := TrackedHammer.new()
+var _grab := BilletGrab.new()
+var _grab_armed := false
+var _grab_source := ""
 var _xr: XRInterface
 var _settings: Dictionary
 var _face_offset: Vector3
@@ -103,6 +107,7 @@ func _add_hammer_handle() -> void:
 func _process(delta: float) -> void:
 	if _tracking == null:
 		return
+	_update_grab()
 	var capture: Variant = _tracking.grip()
 	if _source != _tracking.source:
 		_sweep.reset_tracking()
@@ -113,29 +118,59 @@ func _process(delta: float) -> void:
 		var tip := to_local(grip * _face_offset)
 		_hammer.basis = grip.basis
 		_hammer.position = tip + grip.basis.y * 0.01
-		if _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
+		if not _grab.held and _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
 				session.config.hammer_mass_kg, _settings.maximum_sample_gap_s, _settings.maximum_sample_travel_m):
 			session.strikes += 1
 	else:
 		_sweep.reset_tracking()
 	var started := Time.get_ticks_usec()
-	if not session.billet.step(session.config.step_s) or not session.purification.apply(session.billet):
-		session.errors.append_array(session.billet.errors)
-		session.errors.append_array(session.purification.errors)
-		_fail()
-		set_process(false)
-		return
-	for event: Dictionary in session.purification.events:
-		session.purified_nodes[event.node] = 1
+	if not _grab.held:
+		if not session.billet.step(session.config.step_s) or not session.purification.apply(session.billet):
+			session.errors.append_array(session.billet.errors)
+			session.errors.append_array(session.purification.errors)
+			_fail()
+			set_process(false)
+			return
+		for event: Dictionary in session.purification.events:
+			session.purified_nodes[event.node] = 1
 	session.step_ms = float(Time.get_ticks_usec() - started) / 1000.0
 	var severed := _refresh(false)
-	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS" % [
+	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
 		_source if not _source.is_empty() else "Waiting for right-hand tracking",
-		session.strikes, severed, session.step_ms, Engine.get_frames_per_second()]
+		session.strikes, severed, session.step_ms, Engine.get_frames_per_second(),
+		"Billet held · release left grip to place" if _grab.held else "Left grip near billet to pick up"]
 	_frame_report += delta
 	if _frame_report >= 5.0:
 		_frame_report = 0.0
 		print("Tracked preview: ", _status.text.replace("\n", "  "))
+
+
+func _update_grab() -> void:
+	var sample: Dictionary = _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
+	var source: String = sample.get("source", "")
+	if source != _grab_source:
+		_grab.release()
+		_sweep.reset_tracking()
+		_grab_armed = false
+		_grab_source = source
+	if sample.is_empty():
+		return
+	var pressure: float = sample.pressure
+	if pressure <= _settings.grab_release:
+		if _grab.held:
+			_grab.release()
+			_sweep.reset_tracking()
+		_grab_armed = true
+		return
+	var local_pose: Transform3D = global_transform.affine_inverse() * sample.pose
+	if _grab.held:
+		if not _grab.move(local_pose):
+			_grab.release()
+			_sweep.reset_tracking()
+	elif _grab_armed and pressure >= _settings.grab_press:
+		_grab_armed = false
+		if _grab.acquire(session.billet, local_pose, _settings.grab_reach_m):
+			_sweep.reset_tracking()
 
 
 func _unhandled_input(_event: InputEvent) -> void:
