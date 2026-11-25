@@ -53,9 +53,31 @@
       "use": "Cross-check observed phase changes under the experimental welding thermal histories."
     }
   ],
+  "hot_compression_reference": {
+    "source": "https://www.techscience.com/CMES/v142n3/59762/html",
+    "source_location": "Equation 3, Table 2 and Figure 4",
+    "condition": "Conventionally rolled and normalized bar, heated at 5 °C/s under vacuum",
+    "model": "hensel_spittel",
+    "input_bounds": {
+      "temperature_c": [900, 1280],
+      "true_strain": [0.04, 1],
+      "strain_rate_per_s": [0.1, 100]
+    },
+    "coefficients": {
+      "a_mpa": 0.00204,
+      "m1": -0.00613,
+      "m2": 0.11877,
+      "m3": -0.10138,
+      "m4": -0.00674,
+      "m5": -0.00008,
+      "m7": -0.15830,
+      "m8": 0.00026,
+      "m9": 2.48856
+    }
+  },
   "calibration_gaps": [
     "Reconcile initial condition and deformation-rate coverage for the selected forging grade.",
-    "Fit hot mechanical response without treating finite-strain compression flow stress as zero-strain yield strength.",
+    "Validate the published hot flow fit before adapting it to granular mechanics. Finite-strain compression flow stress does not establish zero-strain yield strength.",
     "Source thermal properties, ductility and heat-treatment behavior for the selected condition before catalog activation."
   ]
 }

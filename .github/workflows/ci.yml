@@ -31,6 +31,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check material research references
+        run: python3 -m unittest discover -s tests/research
+
       - name: Install Godot Standard
         shell: bash
         run: |
