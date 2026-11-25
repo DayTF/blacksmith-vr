@@ -7,8 +7,8 @@ const Sweep = preload("res://src/sim/tracked_hammer.gd")
 func run() -> PackedStringArray:
 	var failures := PackedStringArray()
 	var xr: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/tracked_hammer.json"))
-	var light := _strikes(xr, 0.5)
-	var ordinary := _strikes(xr, 1.5)
+	var light := replay(xr, 0.5)
+	var ordinary := replay(xr, 1.5)
 	if light.is_empty() or ordinary.is_empty():
 		return PackedStringArray(["Tracked resistance fixture must land and step all six strikes."])
 	if light.strain <= 0.0 or ordinary.strain <= light.strain:
@@ -18,7 +18,7 @@ func run() -> PackedStringArray:
 	return failures
 
 
-func _strikes(xr: Dictionary, speed: float) -> Dictionary:
+func replay(xr: Dictionary, speed: float, measure_compression := false) -> Dictionary:
 	var session := Session.new()
 	if not session.initialize():
 		return {}
@@ -31,6 +31,8 @@ func _strikes(xr: Dictionary, speed: float) -> Dictionary:
 	var radius: float = session.config.hammer_radius_m
 	var mass: float = session.config.hammer_mass_kg
 	var sweep := Sweep.new()
+	var initial_height: float = (xr.dimensions[1] - 1) * session.config.spacing_m
+	var compression: Array[Dictionary] = []
 	for strike in 6:
 		var x := 0.004 if strike % 2 else -0.004
 		var top := _height(session.billet.nodes, x, radius)
@@ -39,11 +41,21 @@ func _strikes(xr: Dictionary, speed: float) -> Dictionary:
 		sweep.apply(session.billet, Vector3(x, top + half, -0.03), 0.01, radius, mass, 0.1, 0.25)
 		if not sweep.apply(session.billet, Vector3(x, top - half, -0.03), 0.01, radius, mass, 0.1, 0.25):
 			return {}
+		var previous_height := top
 		for step in 8:
 			if not session.billet.step(session.config.step_s):
 				return {}
+			if measure_compression:
+				var height := _height(session.billet.nodes, x, radius)
+				if height > 0.0 and previous_height > height:
+					compression.append({"temperature_c": session.temperature,
+						"true_strain": log(initial_height / height),
+						"strain_rate_per_s": log(previous_height / height) / session.config.step_s})
+				previous_height = height
 	var result := session.summary()
-	result["initial_height"] = (xr.dimensions[1] - 1) * session.config.spacing_m
+	result["initial_height"] = initial_height
+	if measure_compression:
+		result["compression"] = compression
 	result["working_height"] = _height(session.billet.nodes, 0.0, 0.018)
 	return result
 
