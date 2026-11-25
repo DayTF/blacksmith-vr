@@ -1013,3 +1013,14 @@ gains and distances are in `data/preview/station_audio.json`. To regenerate
 the original mono clips, run `python3 assets/forge_room/audio/synthesize.py`.
 Desktop stereo capture is in `docs/previews/station-audio-stereo.wav`.
 Headset listening and tracked station contact remain open.
+
+## Scripted room thermal equipment (#77)
+
+Open `scenes/forge_room_study.tscn -- --room-heat` to see a cold charge
+heat at the hearth. The `--room-quench` and `--room-quench --room-oil`
+fixtures use the same thermal preview and show the charge in the bath.
+Charge color and HDR emission follow the material's temperature curves.
+The fixture reads the existing thermal boundaries. Headless smoke starts
+a charge near the forge cap and verifies warming without an overshoot.
+Tracked equipment contact and the in-room choice of bath medium remain
+part of #16.
