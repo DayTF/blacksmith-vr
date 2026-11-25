@@ -1112,3 +1112,12 @@ approximation inspired by measured cooling histories
 It does not model soak kinetics, tempering, or the full transformation
 diagram. Converting the outcome into material properties and final item
 statistics remains in #17.
+
+## Material selection in previews (#100)
+
+The desktop billet study lists catalog materials. Changing the selection
+starts a fresh billet at the current temperature preset. The standard
+desktop and tracked previews also accept `-- --preview-material=<catalog-id>`.
+The scripted layered study retains its authored material pair. Unknown IDs
+fail setup and the existing default remains Mithril. Incomplete real-grade
+research lives outside the playable material catalog.

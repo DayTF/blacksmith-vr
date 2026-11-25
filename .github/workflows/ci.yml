@@ -99,6 +99,8 @@ jobs:
           godot --headless --path .build/preview -- --preview-smoke --preview-quench 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           godot --headless --path .build/preview res://scenes/layered_preview.tscn -- --preview-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           godot --headless --path .build/preview res://scenes/layered_preview.tscn -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          godot --headless --path .build/preview -- --preview-smoke --preview-cold --preview-before-strike --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
+          grep -q 'Preview material: prototype_embersteel' "$RUNNER_TEMP/preview.log"
           godot --headless --path .build/preview -- --preview-naming-smoke 2>&1 | tee -a "$RUNNER_TEMP/preview.log"
           grep -q 'Named billet ready:' "$RUNNER_TEMP/preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/preview.log" "$RUNNER_TEMP/preview-rest.log"; then
@@ -115,6 +117,8 @@ jobs:
           godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/tracked-preview.log"
           godot --headless --xr-mode off --path .build/xr-preview -- --tracked-bath-smoke 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
           grep -q 'Tracked bath ready: water' "$RUNNER_TEMP/tracked-preview.log"
+          godot --headless --xr-mode off --path .build/xr-preview -- --tracked-preview-smoke --preview-material=prototype_embersteel 2>&1 | tee -a "$RUNNER_TEMP/tracked-preview.log"
+          grep -q 'Tracked material: prototype_embersteel' "$RUNNER_TEMP/tracked-preview.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/tracked-preview.log"; then
             exit 1
           fi
