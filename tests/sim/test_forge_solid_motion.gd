@@ -23,6 +23,8 @@ func run() -> PackedStringArray:
 	var side := Motion.constrain(TONGS, placed, placed.translated(Vector3.RIGHT * 2.0))
 	if absf(side.origin.x - (-0.1152)) > 0.001:
 		failures.append("Tongs tunneled through the side brick.")
-	if not Motion.constrain(TONGS, placed, hand, true).is_equal_approx(hand):
+	if not Motion.fits(TONGS, hand):
 		failures.append("Remote retrieval could not place tongs into a clear hand.")
+	if Motion.fits(TONGS, placed.translated(Vector3.DOWN * 0.4)):
+		failures.append("Remote retrieval must reject a destination inside the hearth.")
 	return failures

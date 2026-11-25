@@ -79,6 +79,9 @@ jobs:
       - name: Verify working billet pickup and forge heating
         run: godot --headless --xr-mode off --path "$RUNNER_TEMP/blacksmith-validation" --script tests/verify_working_billet_pickup.gd
 
+      - name: Verify pickup visibility in the forge room
+        run: godot --headless --xr-mode off --path "$RUNNER_TEMP/blacksmith-validation" --script tests/verify_pickup_visibility.gd
+
       - name: Measure tracked fixture compression
         run: godot --headless --path "$RUNNER_TEMP/blacksmith-validation" --script tests/measure_tracked_compression.gd
 

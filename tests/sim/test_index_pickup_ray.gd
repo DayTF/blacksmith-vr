@@ -20,6 +20,13 @@ func run() -> PackedStringArray:
 		failures.append("An already held prop is unavailable to the other hand.")
 	if Ray.nearest(Transform3D.IDENTITY, right.tools, 1.0, -1).target != -1:
 		failures.append("Props beyond pickup range are excluded.")
+	var wall := {"pose": Transform3D(Basis.IDENTITY, Vector3(0, 0, -3)),
+		"aim_bounds": AABB(Vector3(-1, -1, -0.1), Vector3(2, 2, 0.2))}
+	if Ray.nearest(Transform3D.IDENTITY, right.tools, 5.0, -1, [wall]).target != 0:
+		failures.append("A fixture behind a visible prop cannot hide it.")
+	var blocked := Ray.nearest(Transform3D.IDENTITY, right.tools, 5.0, 0, [wall])
+	if blocked.target != -1 or not is_equal_approx(blocked.distance, 2.9):
+		failures.append("A fixture stops the pickup beam and hides props beyond it.")
 	if not Ray.points(Vector3.ZERO, Vector3.FORWARD, 2.0 * Vector3.FORWARD) \
 			or Ray.points(Vector3.ZERO, Vector3.FORWARD, Vector3.FORWARD + Vector3.DOWN):
 		failures.append("Pointing requires an extended finger.")

@@ -9,25 +9,23 @@ static func points(proximal: Vector3, middle: Vector3, tip: Vector3) -> bool:
 		and first.normalized().dot(second.normalized()) >= 0.85
 
 
-static func nearest(ray: Transform3D, tools: Array[Dictionary], reach: float, unavailable: int) -> Dictionary:
+static func nearest(ray: Transform3D, tools: Array[Dictionary], reach: float, unavailable: int,
+		blockers: Array[Dictionary] = []) -> Dictionary:
 	var result := {"target": -1, "distance": reach}
 	if not ray.is_finite() or ray.basis.z.length_squared() < 0.000001:
 		return result
 	var direction := -ray.basis.z.normalized()
+	for blocker in blockers:
+		result.distance = minf(result.distance, _box_distance(ray.origin, direction, blocker))
 	for index in tools.size():
 		if index == unavailable:
 			continue
 		var tool := tools[index]
 		var pose: Transform3D = tool.pose
 		if tool.has("aim_bounds"):
-			var inverse := pose.affine_inverse()
-			var box: AABB = tool.aim_bounds
-			var local_origin := inverse * ray.origin
-			var hit: Variant = local_origin if box.has_point(local_origin) else box.intersects_ray(local_origin, inverse.basis * direction)
-			if hit is Vector3:
-				var distance: float = (pose * hit).distance_to(ray.origin)
-				if distance < float(result.distance):
-					result = {"target": index, "distance": distance}
+			var distance := _box_distance(ray.origin, direction, tool)
+			if distance < float(result.distance):
+				result = {"target": index, "distance": distance}
 			continue
 		var center := pose * Vector3(tool.get("aim_offset", Vector3.ZERO))
 		var offset := center - ray.origin
@@ -40,3 +38,14 @@ static func nearest(ray: Transform3D, tools: Array[Dictionary], reach: float, un
 		if distance < float(result.distance):
 			result = {"target": index, "distance": distance}
 	return result
+
+
+static func _box_distance(origin: Vector3, direction: Vector3, entry: Dictionary) -> float:
+	var pose: Transform3D = entry.pose
+	var inverse := pose.affine_inverse()
+	var box: AABB = entry.aim_bounds
+	var local_origin := inverse * origin
+	if box.has_point(local_origin):
+		return 0.0
+	var hit: Variant = box.intersects_ray(local_origin, inverse.basis * direction)
+	return origin.distance_to(pose * hit) if hit is Vector3 else INF
