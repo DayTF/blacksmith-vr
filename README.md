@@ -2,21 +2,21 @@
 
 A VR blacksmithing simulator with granular, data-driven materials and physical forging.
 
-Try the early desktop preview now. It shows a small live billet under synthetic
-hammer strikes: compare hot plastic deformation with cold fracture, replay/pause,
-and orbit the view. Thermal inspection adds live heating, air cooling, and
-water/oil quenching. This is an inspection demo, before tracked VR input or the
-full forging loop.
+## Open a project
 
-```sh
-python3 tools/prepare_preview.py
-```
+Run `python3 tools/prepare_preview.py` from the repository root to refresh
+both launch folders. Open one of these files in **Godot 4.7+ Standard** and
+press **F5**.
 
-Open `.build/preview/project.godot` in **Godot 4.7+ Standard** and press **F5**.
-This stages a GDScript-only, 81-point fixture: no C++ toolchain is needed for the
-preview. Re-run the command after source changes. Alternatively, run
-`godot --path .build/preview`. The full root project still requires the native
-extension build described in [AGENTS.md](AGENTS.md).
+| Project | Use |
+| --- | --- |
+| `Desktop/project.godot` | Billet study, material selection and scripted desktop scenes |
+| `VR/project.godot` | Interactive forge room, tracked hands and tools through SteamVR |
+
+The launch folders are siblings at the repository root. The shared source,
+project template and build caches are maintained from the repository root.
+Refresh the same folders after source changes. To inspect the forge room
+without a headset, open `scenes/forge_room_study.tscn` from Desktop and press **F6**.
 
 - Right mouse drag: orbit. Mouse wheel: zoom.
 - Use the temperature dropdown to restart hot (1000 °C) or cold (20 °C).
@@ -56,11 +56,11 @@ simulation targets remain separate; optimization is deferred behind visual work.
 For automated scene verification or an actual rendered capture:
 
 ```sh
-godot --headless --path .build/preview -- --preview-smoke --preview-purification
-godot --headless --path .build/preview -- --preview-smoke --preview-cold
-godot --headless --path .build/preview -- --preview-smoke --preview-heat
-godot --headless --path .build/preview -- --preview-smoke --preview-quench
-godot --path .build/preview -- --preview-heat --preview-capture=/absolute/path/preview.png
+godot --headless --path Desktop -- --preview-smoke --preview-purification
+godot --headless --path Desktop -- --preview-smoke --preview-cold
+godot --headless --path Desktop -- --preview-smoke --preview-heat
+godot --headless --path Desktop -- --preview-smoke --preview-quench
+godot --path Desktop -- --preview-heat --preview-capture=/absolute/path/preview.png
 ```
 
 Add `--preview-before-strike` to verify/capture the undamaged resting billet.
@@ -94,8 +94,11 @@ rejected atomically; zero-mass topology deletion is not implemented.
 ## Headless forging replay
 
 ```sh
-godot --headless --path . --script tests/forging_harness.gd
-godot --headless --path . --script tests/benchmark_mechanics.gd -- --backend=native-resident
+validation_dir="$(mktemp -d)"
+python3 tools/prepare_preview.py --validation-dir "$validation_dir"
+godot --headless --path "$validation_dir" --editor --import --quit
+godot --headless --path "$validation_dir" --script tests/forging_harness.gd
+godot --headless --path "$validation_dir" --script tests/benchmark_mechanics.gd -- --backend=native-resident
 ```
 
 The replay emits JSON checkpoints for a mixed-material billet through heating,
@@ -107,7 +110,7 @@ step against the 1 ms budget. [Benchmark samples](benchmarks/forging-harness-mec
 
 ## Try the layered weld replay
 
-Run `python3 tools/prepare_preview.py`, open `.build/preview/project.godot`
+Run `python3 tools/prepare_preview.py`, open `Desktop/project.godot`
 in Godot 4.7 Standard, and press **F5**. Select **Open layered weld replay**.
 Watch the hot pass, then choose **Cold comparison**. The same two patches
 contact under the hammer. The hot strike creates two mint-marked bonds and the
@@ -122,15 +125,15 @@ strike. The replay ends at the welding strike.
 
 ## Try tracked hammering in SteamVR
 
-1. Run `python3 tools/prepare_preview.py --xr`.
+1. Run `python3 tools/prepare_preview.py` to refresh the launch folders.
 2. Start SteamVR with your headset connected and select SteamVR as the active
    OpenXR runtime in SteamVR settings.
-3. Open `.build/xr-preview/project.godot` in Godot 4.7 Standard and press **F5**.
+3. Open `VR/project.godot` in Godot 4.7 Standard and press **F5**.
 4. Face the anvil in your play area. Raise the right controller or tracked
    hand above the billet and swing down. The mirror window shows the tracking
    source, hit count, simulation step time, and host FPS.
 
-The hot billet uses a 30-point reference solver fixture with a fixed anvil.
+The VR project uses a 30-point reference fixture when native libraries are unavailable.
 The initial grip offset is in `data/preview/tracked_hammer.json`. The fixture
 uses an OpenXR hand joint when available and falls back to the right controller's
 grip pose. The fixture uses the runtime controller model when available and a simple grip
@@ -139,9 +142,9 @@ Headset tracking, grip alignment and headset frame timing need a hardware pass.
 
 The larger XR fixture uses the native solver. With the extension built for
 your host, run `python3 tools/prepare_preview.py --xr --native` and open
-`.build/xr-preview-native/project.godot`. This fixture is 37.5 × 25 × 75 mm
-with 12.5 mm simulation spacing. The regular `--xr` project remains available
-as the smaller, native-free fixture.
+`VR/project.godot`. This fixture is 37.5 × 25 × 75 mm
+with 12.5 mm simulation spacing. Use `--xr` by itself to stage the smaller
+reference fixture in the same VR folder.
 
 For the placement preview, move your left controller close to the billet and
 squeeze its grip. Lift or turn the piece, then release the grip over the anvil.

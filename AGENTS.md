@@ -20,6 +20,15 @@ simulator. Create a `question` issue and ask only when requirements conflict or
 a consequential gameplay or physical choice remains unresolved after applying
 this default. Keep this guide current when decisions or public sim APIs change.
 
+## Launch projects
+
+Keep exactly two Godot launch projects directly under the repository root:
+`Desktop/project.godot` and `VR/project.godot`. Refresh both with
+`python3 tools/prepare_preview.py`. Reuse these two folders for every build.
+Keep shared source at the root and use `project.godot.in` as its template.
+Use `.build/` for build products and caches only. Put temporary full test
+projects outside the repository.
+
 ## Stack and layout
 
 - Godot **4.7+ Standard**, GDScript with the approved native C++ hot-loop exception
@@ -233,10 +242,11 @@ Run with Godot Standard 4.7+ (`godot` below means your installed binary):
 cmake -S native -B .build/native -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build .build/native --parallel 2
 ctest --test-dir .build/native --output-on-failure
-python3 tools/prepare_native_import.py
-godot --headless --path . --editor --import --quit
-godot --headless --path . --script tests/check_scripts.gd
-godot --headless --path . --script tests/run_all.gd
+validation_dir="$(mktemp -d)"
+python3 tools/prepare_preview.py --validation-dir "$validation_dir"
+godot --headless --path "$validation_dir" --editor --import --quit
+godot --headless --path "$validation_dir" --script tests/check_scripts.gd
+godot --headless --path "$validation_dir" --script tests/run_all.gd
 git diff --check
 ```
 
@@ -398,7 +408,7 @@ volume gradients, flattening/spreading, mass/momentum and rejected-step atomicit
 
 ### Performance gate: not met
 
-Run `godot --headless --path . --script tests/benchmark_mechanics.gd` for the
+Run `godot --headless --path "$validation_dir" --script tests/benchmark_mechanics.gd` for the
 opt-in mechanics benchmark; fixture parameters are in mechanics.json. Timings
 exclude startup, grid construction and output. `benchmarks/mechanics-baseline.json`
 records the initial reference result: 5,000 nodes, 14,050 links, 4,104 volume cells,
@@ -465,8 +475,8 @@ Build **before** importing/running the project; the manifest expects a native
 library. Linux x86_64 is tested. Windows paths/build output are configured but
 Windows native compilation and XR hardware have not been validated yet.
 
-Before a fresh headless editor import, run `tools/prepare_native_import.py` after
-building. It preserves existing entries and lists our built extension in the
+The staging script calls `tools/prepare_native_import.py`'s registry helper
+before importing a project with native binaries. It preserves existing entries and lists our built extension in the
 generated `.godot/extension_list.cfg`, so classes load at startup. This contains
 Godot's deferred extension-documentation shutdown race (upstream
 [issue #111048](https://github.com/godotengine/godot/issues/111048) and
@@ -545,7 +555,7 @@ and applies the existing hammer impulse API. It is not player input. Its optiona
 thermal inspection calls ThermalModel; strike replay retains constant temperature. The current fixture has 81 points and cannot establish benchmark speed.
 
 `python3 tools/prepare_preview.py` stages an allow-listed GDScript-only project
-under `.build/preview` so Windows users can launch the small reference fixture
+under `Desktop` so Windows users can launch the small reference fixture
 without native compilation. No native extension manifest is copied. This does
 not remove native requirements from root-project validation or production work.
 Re-run staging after edits. See README.md for controls and capture/smoke commands.
@@ -749,7 +759,7 @@ forging harness. The desktop preview and XR input are unaffected. Next is #13.
 
 ## Standalone M0 forging replay (#14)
 
-Run `godot --headless --path . --script tests/forging_harness.gd`.
+Run `godot --headless --path "$validation_dir" --script tests/forging_harness.gd`.
 The JSON lines log individual positions, temperatures, layer and material IDs,
 local impurities, and discarded impurity/matter mass. A 75-point, two-material
 fixture heats, folds, welds, cools to the working range, spreads and purifies
@@ -818,9 +828,8 @@ exception allows M1 exploration while the production performance gate is open.
 
 ## Tracked hammer development fixture (#15)
 
-`python3 tools/prepare_preview.py --xr` stages `.build/xr-preview` with
-OpenXR enabled and a native-free 30-point reference fixture. The default
-desktop staging command retains its existing scene. The XR fixture uses a
+`python3 tools/prepare_preview.py --xr` stages `VR` with
+OpenXR enabled and a native-free 30-point reference fixture. The Desktop launch folder retains its existing scene. The XR fixture uses a
 stationary anvil and adds no locomotion or button-triggered impacts.
 
 `src/vr/hammer_tracking.gd` adapts right-hand knuckle tracking or the grip
@@ -891,9 +900,9 @@ hardware retest.
 ## Larger native XR fixture (#51)
 
 `python3 tools/prepare_preview.py --xr --native` stages
-`.build/xr-preview-native` with the built extension. The XR scene explicitly
+`VR` with the built extension. The XR scene explicitly
 selects the native adapter for this project. The native-free `--xr` command
-still stages the original 30-point fixture at `.build/xr-preview`. The larger
+still stages the original 30-point fixture in the same `VR` folder. The larger
 billet uses 84 points at 12.5 mm pitch, for dimensions 37.5 × 25 × 75 mm.
 Its initial mass is 169.46 g at the prescribed temperature, calculated by
 the existing density curve. Both fixtures retain their centered placement.
@@ -1135,7 +1144,7 @@ strain rate in reciprocal seconds. The evaluator refuses extrapolation.
 Its tests cross-check the published fitted curves. The fit stays in the
 research data and is distinct from the annealed NIST dataset.
 
-Run `godot --headless --script tests/measure_tracked_compression.gd`
+Run `godot --headless --path "$validation_dir" --script tests/measure_tracked_compression.gd`
 to compare the tracked resistance fixture against the reported 1045 fit
 domain (#106). The diagnostic uses the vertical envelope near the
 hammer and the flat anvil as a height reference. It reports interval
@@ -1146,7 +1155,7 @@ Neither replay had a compressive interval inside all published fit bounds.
 
 The copper thermal coupon (#108) uses `data/research/copper_thermal_reference.json`
 and the same thermal solver as the game. Run
-`godot --headless --script tests/measure_copper_conduction.gd -- 100 900`
+`godot --headless --path "$validation_dir" --script tests/measure_copper_conduction.gd -- 100 900`
 with two starting temperatures in Celsius. The fixture checks heat-flow
 direction, thermal equilibrium and internal energy drift with insulation.
 Conductivity uses the RRR 100 reference column and heat capacity uses
