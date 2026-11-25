@@ -1001,3 +1001,15 @@ to run a scripted hot bath through the existing thermal boundary. Combine
 it with `--room-oil` to inspect the oil fixture. The desktop fixture drives
 the effects from measured billet cooling. Tracked station contact remains
 in #16.
+
+## Positional station and impact audio (#75)
+
+The shared room plays hearth ambience from the fire and cooling-dependent
+hiss from the tank. The desktop billet preview and tracked hammer both play
+an impact at the accepted contact after the mechanics step succeeds. The
+equal-power mix uses the committed plastic strain increment and remaining
+elastic spring strain. Delivered impulse scales the impact gain. Presentation
+gains and distances are in `data/preview/station_audio.json`. To regenerate
+the original mono clips, run `python3 assets/forge_room/audio/synthesize.py`.
+Desktop stereo capture is in `docs/previews/station-audio-stereo.wav`.
+Headset listening and tracked station contact remain open.

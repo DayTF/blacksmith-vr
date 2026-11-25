@@ -2,9 +2,11 @@ extends Node3D
 
 const QuenchLiquid := preload("res://shaders/quench_liquid.gdshader")
 
+const ForgeAudio := preload("res://src/game/forge_audio.gd")
 const StationEffects := preload("res://src/game/forge_station_effects.gd")
 const PreviewSession := preload("res://src/game/preview_session.gd")
 
+var _station_audio := ForgeAudio.new()
 var _effects := StationEffects.new()
 var _quench: PreviewSession
 var _quench_smoke := false
@@ -24,6 +26,8 @@ func _ready() -> void:
 	set_quench_medium(medium)
 	_effects.name = "StationEffects"
 	add_child(_effects)
+	add_child(_station_audio)
+	_station_audio.start_stations(StationEffects.HEARTH, StationEffects.BATH)
 	_quench_smoke = "--room-quench-smoke" in args
 	if (_quench_smoke or "--room-quench" in args) and has_node("FrontView"):
 		_start_quench_preview(medium)
@@ -66,9 +70,13 @@ func _physics_process(delta: float) -> void:
 	var intensity := clampf((_quench_temperature - temperature) / (delta * 340.0), 0.0, 1.0)
 	_quench_temperature = temperature
 	_effects.set_quench_intensity(intensity)
+	_station_audio.set_quench_intensity(intensity)
 	if _quench_smoke and _quench_temperature < _quench_start_temperature:
 		if not _effects.get_node("QuenchSteam").emitting:
 			_quench_failed(PackedStringArray(["Steam did not respond to measured cooling."]))
+			return
+		if _station_audio.get_node("QuenchHiss").volume_db <= -80.0:
+			_quench_failed(PackedStringArray(["Quench hiss did not respond to measured cooling."]))
 			return
 		print("Room quench ready: ", _quench.boundary.id)
 		get_tree().quit()
@@ -85,6 +93,7 @@ func _mean_quench_temperature() -> float:
 
 func _quench_failed(errors: PackedStringArray) -> void:
 	_effects.set_quench_intensity(0.0)
+	_station_audio.set_quench_intensity(0.0)
 	_quench = null
 	push_error("Quench presentation failed: " + "; ".join(errors))
 	if _quench_smoke:

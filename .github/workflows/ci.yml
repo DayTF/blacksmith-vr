@@ -91,6 +91,7 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/prepare_preview.py
+          godot --headless --path .build/preview --editor --import --quit
           godot --headless --path .build/preview -- --preview-smoke --preview-cold --preview-before-strike 2>&1 | tee "$RUNNER_TEMP/preview-rest.log"
           godot --headless --path .build/preview -- --preview-smoke --preview-purification 2>&1 | tee "$RUNNER_TEMP/preview.log"
           godot --headless --path .build/preview -- --preview-smoke --preview-cold 2>&1 | tee -a "$RUNNER_TEMP/preview.log"

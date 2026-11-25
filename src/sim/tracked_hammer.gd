@@ -1,6 +1,7 @@
 extends RefCounted
 ## Continuous downward tip sweep against the existing flat-anvil hammer contact.
 
+var last_contact := Vector3.ZERO
 var _previous: Vector3
 var _tracking := false
 
@@ -34,7 +35,10 @@ func apply(billet: RefCounted, tip: Vector3, delta: float, radius: float, mass: 
 		if offset.length_squared() <= radius_squared and _is_frontmost(billet.nodes, candidate, point.y, radius_squared):
 			earliest = fraction
 			center = Vector3(candidate.x, point.y, candidate.z)
-	return earliest < INF and billet.hammer(center, Vector3.UP, radius, mass, travel / delta)
+	if earliest == INF or not billet.hammer(center, Vector3.UP, radius, mass, travel / delta):
+		return false
+	last_contact = center
+	return true
 
 
 func _is_frontmost(nodes: Array[Dictionary], center: Vector3, height: float, radius_squared: float) -> bool:

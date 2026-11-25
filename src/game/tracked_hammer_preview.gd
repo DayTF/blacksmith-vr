@@ -54,6 +54,7 @@ func _ready() -> void:
 	session.config.emission_scale = _settings.render_emission_scale
 	_show_wire = "--show-billet-lattice" in OS.get_cmdline_user_args()
 	_build_room()
+	_build_strike_audio()
 	_add_hammer_handle()
 	_build_tools()
 	_build_landing_marker()
@@ -207,12 +208,14 @@ func _process(delta: float) -> void:
 	_update_grab()
 	var tool_hand: Dictionary = _tracking.tool_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
 	_update_tools(delta, tool_hand)
+	var strike_landed := false
 	if _tools.held >= 0 and _tools.tools[_tools.held].kind == "hammer" and not _grab.held:
 		var pose: Transform3D = _tools.tools[_tools.held].pose
 		var tip := pose * _face_offset
 		if _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
 				session.config.hammer_mass_kg, _settings.maximum_sample_gap_s, _settings.maximum_sample_travel_m):
 			session.strikes += 1
+			strike_landed = true
 	else:
 		_sweep.reset_tracking()
 	var started := Time.get_ticks_usec()
@@ -226,6 +229,8 @@ func _process(delta: float) -> void:
 		for event: Dictionary in session.purification.events:
 			session.purified_nodes[event.node] = 1
 	session.step_ms = float(Time.get_ticks_usec() - started) / 1000.0
+	if strike_landed:
+		_strike_audio.play_strike(session.billet, _sweep.last_contact)
 	var severed := _refresh(false)
 	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
 		_tools.tools[_tools.held].name + " held" if _tools.held >= 0 else "Right grip near a tool to pick it up",
