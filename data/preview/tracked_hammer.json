@@ -9,5 +9,7 @@
   "maximum_sample_travel_m": 0.25,
   "dimensions": [3, 2, 5],
   "native_dimensions": [4, 3, 7],
-  "native_spacing_m": 0.0125
+  "native_spacing_m": 0.0125,
+  "render_corner_radius_m": 0.0035,
+  "render_emission_scale": 0.24
 }

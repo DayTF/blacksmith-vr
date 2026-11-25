@@ -3,6 +3,7 @@ extends Node3D
 
 const Session = preload("res://src/game/preview_session.gd")
 const LayeredSession = preload("res://src/game/layered_preview_session.gd")
+const RoundedSurface = preload("res://src/game/rounded_billet_surface.gd")
 const FractureGeometry = preload("res://src/game/fracture_preview_geometry.gd")
 
 @export var layered_replay := false
@@ -18,6 +19,9 @@ var _pause: Button
 var _presets: OptionButton
 var _environments: OptionButton
 var _faces: Array = []
+var _rounded_surface: RefCounted
+var _rounding_radius := 0.0
+var _show_wire := true
 var _yaw := 0.65
 var _pitch := 0.55
 var _distance := 0.32
@@ -183,6 +187,8 @@ func _cache_faces() -> void:
 			else:
 				boundary[key] = face
 	_faces = boundary.values()
+	if _rounding_radius > 0.0:
+		_rounded_surface = RoundedSurface.new(session.billet.nodes, _rounding_radius)
 
 
 func _refresh(update_controls: bool = true) -> int:
@@ -208,8 +214,13 @@ func _refresh(update_controls: bool = true) -> int:
 		emissions.append(sample[1] * session.config.emission_scale)
 	var triangles := SurfaceTool.new()
 	triangles.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var vertex_count := 0
 	for face: Array in _faces:
 		for triangle: Array in FractureGeometry.visible_triangles(face, severed):
+			if _rounded_surface != null:
+				_rounded_surface.append(triangles, triangle, nodes, colors, emissions, vertex_count)
+				vertex_count += RoundedSurface.WEIGHTS.size()
+				continue
 			var a: Vector3 = nodes[triangle[0]].position
 			var b: Vector3 = nodes[triangle[1]].position
 			var c: Vector3 = nodes[triangle[2]].position
@@ -230,8 +241,9 @@ func _refresh(update_controls: bool = true) -> int:
 			continue
 		for index: int in [link.a, link.b]:
 			bonded[index] = 1
-			lines.add_vertex(nodes[index].position + Vector3.UP * 0.00015)
-	_wire.mesh = lines.commit()
+			if _show_wire:
+				lines.add_vertex(nodes[index].position + Vector3.UP * 0.00015)
+	_wire.mesh = lines.commit() if _show_wire else null
 	var fragment_count := 0
 	if not severed.is_empty():
 		for index in nodes.size():

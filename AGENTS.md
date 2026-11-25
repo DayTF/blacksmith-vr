@@ -894,3 +894,17 @@ mesh CPU updates. The 30-point reference fixture measured 10.08, 12.37,
 and 0.32 ms on the same host. All six swings landed in both, mass was
 conserved, and neither severed a link. The CPU timings exclude GPU and
 SteamVR compositor time. Steam Frame frame timing is pending.
+
+## Rounded XR billet skin (#52)
+
+The XR preview rounds the visible billet by mapping a 3.5 mm rounded reference
+surface onto the current lattice. It subdivides supported surface triangles,
+moves them with the live vertices and orientations, and interpolates
+temperature color and emission. Failed face connections remain open. Mechanics,
+contact coordinates and matter mass remain unchanged. Diagnostic lattice
+lines are hidden by default in XR and available with `-- --show-billet-lattice`.
+The desktop diagnostic view retains its existing wire overlay.
+
+The 84-point Windows headless working replay measured 1.89 ms median for
+rounded mesh CPU updates, compared with 0.91 ms for the previous faceted mesh.
+The Windows Forward+ capture is in `docs/previews/rounded-xr-billet.png`.
