@@ -157,3 +157,15 @@ rack. Equipment and tracked interactions are developed separately.
 
 The checked-in GLB can be rebuilt with
 `blender --background --python assets/forge_room/build_room.py`.
+
+### Interactive XR room controls
+
+- Walk physically in your tracked area. Push the **left thumbstick forward**
+  to aim a teleport. Release it when the floor marker is visible.
+- Squeeze the **right grip** near the hammer handle to pick it up. Open your
+  grip to release it. The tongs use the same pickup interaction.
+- The **left grip** still lifts and places the billet. With optical hand
+  tracking, use a thumb/index pinch for the corresponding grip.
+
+The interactive room uses the same staged XR projects. In a freshly staged
+project, let Godot import the room GLB before running.

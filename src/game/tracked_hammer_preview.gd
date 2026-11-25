@@ -1,5 +1,8 @@
 extends "res://src/game/billet_preview.gd"
 
+const WorldTools = preload("res://src/vr/world_tool_grip.gd")
+const Teleport = preload("res://src/vr/forge_teleport.gd")
+const Room = preload("res://scenes/forge_room_study.tscn")
 const NativeBillet = preload("res://src/sim/native_granular_billet.gd")
 const BilletGrab = preload("res://src/sim/billet_grab.gd")
 const TrackedHammer = preload("res://src/sim/tracked_hammer.gd")
@@ -13,7 +16,10 @@ var _grab_source := ""
 var _xr: XRInterface
 var _settings: Dictionary
 var _face_offset: Vector3
-var _source := ""
+var _tools := WorldTools.new()
+var _aiming := false
+var _teleport_target: Variant
+var _landing := MeshInstance3D.new()
 var _frame_report := 0.0
 
 
@@ -44,22 +50,23 @@ func _ready() -> void:
 	session.billet.tuning.hammer_impulse_transfer = _settings.hammer_impulse_transfer
 	session.billet.tuning.anvil_friction_coefficient = _settings.anvil_friction_coefficient
 	session.billet.tuning.maximum_density_multiplier = _settings.maximum_density_multiplier
-	_stage_floor_y = -_settings.anvil_height_m
 	_rounding_radius = _settings.render_corner_radius_m
 	session.config.emission_scale = _settings.render_emission_scale
 	_show_wire = "--show-billet-lattice" in OS.get_cmdline_user_args()
-	_build_stage()
+	_build_room()
 	_add_hammer_handle()
+	_build_tools()
+	_build_landing_marker()
 	_cache_faces()
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	_status.position = Vector2(28, 24)
 	canvas.add_child(_status)
-	_refresh()
-	_hammer.hide()
+	_refresh(false)
+	_update_tools(0.0, {})
 	if DisplayServer.get_name() == "headless":
 		if "--tracked-preview-smoke" in OS.get_cmdline_user_args():
-			if session.strikes != 0 or not session.billet.step(session.config.step_s):
+			if session.strikes != 0 or _tools.held >= 0 or _tools.tools.size() != 2 or not session.billet.step(session.config.step_s):
 				_setup_failed("Tracked fixture failed its initial mechanics step.")
 				return
 			print("Tracked preview ready: ", session.billet.nodes.size(), " points, ",
@@ -74,10 +81,98 @@ func _ready() -> void:
 		set_process(false)
 		return
 	_tracking = HammerTracking.new()
-	_tracking.position = Vector3(0.0, -_settings.anvil_height_m, _settings.anvil_reach_m)
+	_tracking.position = Vector3(0.0, Teleport.FLOOR, 2.5)
 	add_child(_tracking)
 	get_viewport().use_xr = true
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+
+
+func _build_room() -> void:
+	var room: Node3D = Room.instantiate()
+	room.position = Vector3(0.0, Teleport.FLOOR, 0.18)
+	var study_camera := room.get_node("FrontView")
+	room.remove_child(study_camera)
+	study_camera.free()
+	add_child(room)
+	_build_visuals()
+
+
+func _build_tools() -> void:
+	var tongs := Node3D.new()
+	add_child(tongs)
+	var finish := StandardMaterial3D.new()
+	finish.albedo_color = Color("354651")
+	finish.metallic = 0.8
+	for side in [-1.0, 1.0]:
+		var arm := MeshInstance3D.new()
+		var bar := BoxMesh.new()
+		bar.size = Vector3(0.008, 0.012, 0.23)
+		bar.material = finish
+		arm.mesh = bar
+		arm.position = Vector3(side * 0.018, 0, -0.045)
+		arm.rotation.y = side * 0.08
+		tongs.add_child(arm)
+	_tools.tools = [
+		{"name": "Hammer", "kind": "hammer", "pose": Transform3D(Basis.IDENTITY, Vector3(0.14, 0.045, 0.11)), "mesh": _hammer,
+			"offset": _face_offset + Vector3.UP * 0.01, "fall": 0.0, "clearance": 0.04},
+		{"name": "Tongs", "kind": "tongs", "pose": Transform3D(Basis.IDENTITY, Vector3(-0.15, 0.014, 0.11)), "mesh": tongs,
+			"offset": Vector3.ZERO, "fall": 0.0, "clearance": 0.008},
+	]
+
+
+func _build_landing_marker() -> void:
+	var disk := CylinderMesh.new()
+	disk.top_radius = 0.12
+	disk.bottom_radius = 0.12
+	disk.height = 0.006
+	var finish := StandardMaterial3D.new()
+	finish.albedo_color = Color("7ee9dc")
+	finish.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	disk.material = finish
+	_landing.mesh = disk
+	_landing.hide()
+	add_child(_landing)
+
+
+func _update_tools(delta: float, sample: Dictionary) -> void:
+	if not sample.is_empty():
+		sample.pose = global_transform.affine_inverse() * sample.pose
+	if _tools.update(sample, _settings.grab_reach_m, _settings.grab_press, _settings.grab_release):
+		_sweep.reset_tracking()
+	for index in _tools.tools.size():
+		var tool := _tools.tools[index]
+		var pose: Transform3D = tool.pose
+		if index == _tools.held:
+			tool.fall = 0.0
+		else:
+			var above_anvil := absf(pose.origin.x) < 0.24 and absf(pose.origin.z) < 0.155
+			var support: float = tool.clearance + (0.0 if above_anvil else Teleport.FLOOR)
+			tool.fall += delta * 9.81
+			pose.origin.y = maxf(support, pose.origin.y - tool.fall * delta)
+			if pose.origin.y <= support:
+				tool.fall = 0.0
+			tool.pose = pose
+		tool.mesh.transform = pose.translated_local(tool.offset)
+
+
+func _update_teleport() -> void:
+	var sample: Dictionary = _tracking.aim()
+	if sample.is_empty():
+		_aiming = false
+		_teleport_target = null
+	elif sample.stick > (0.35 if _aiming else 0.65):
+		_aiming = true
+		_teleport_target = Teleport.target(global_transform.affine_inverse() * sample.pose)
+	elif _aiming:
+		_aiming = false
+		var target: Variant = Teleport.target(global_transform.affine_inverse() * sample.pose)
+		if _teleport_target is Vector3 and target is Vector3 and target.distance_to(_teleport_target) <= 0.10:
+			_tracking.position += Teleport.room_shift(_teleport_target, to_local(_tracking.head_position()))
+			_sweep.reset_tracking()
+		_teleport_target = null
+	_landing.visible = _teleport_target is Vector3
+	if _landing.visible:
+		_landing.position = _teleport_target + Vector3.UP * 0.007
 
 
 func _setup_failed(message: String) -> void:
@@ -107,18 +202,15 @@ func _add_hammer_handle() -> void:
 func _process(delta: float) -> void:
 	if _tracking == null:
 		return
+	_tracking.update_hands()
+	_update_teleport()
 	_update_grab()
-	var capture: Variant = _tracking.grip()
-	if _source != _tracking.source:
-		_sweep.reset_tracking()
-		_source = _tracking.source
-	_hammer.visible = capture is Transform3D
-	if _hammer.visible:
-		var grip: Transform3D = capture
-		var tip := to_local(grip * _face_offset)
-		_hammer.basis = grip.basis
-		_hammer.position = tip + grip.basis.y * 0.01
-		if not _grab.held and _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
+	var tool_hand: Dictionary = _tracking.tool_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
+	_update_tools(delta, tool_hand)
+	if _tools.held >= 0 and _tools.tools[_tools.held].kind == "hammer" and not _grab.held:
+		var pose: Transform3D = _tools.tools[_tools.held].pose
+		var tip := pose * _face_offset
+		if _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
 				session.config.hammer_mass_kg, _settings.maximum_sample_gap_s, _settings.maximum_sample_travel_m):
 			session.strikes += 1
 	else:
@@ -136,7 +228,7 @@ func _process(delta: float) -> void:
 	session.step_ms = float(Time.get_ticks_usec() - started) / 1000.0
 	var severed := _refresh(false)
 	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
-		_source if not _source.is_empty() else "Waiting for right-hand tracking",
+		_tools.tools[_tools.held].name + " held" if _tools.held >= 0 else "Right grip near a tool to pick it up",
 		session.strikes, severed, session.step_ms, Engine.get_frames_per_second(),
 		"Billet held · release left grip to place" if _grab.held else "Left grip near billet to pick up"]
 	_frame_report += delta

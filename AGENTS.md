@@ -960,3 +960,24 @@ interaction (#68). A held hammer still requires tracked arm motion to forge.
 The attached right-hand hammer and fixed stage in the older XR preview are
 development fixtures; the acceptance criteria for the interactive game
 are recorded under the new issues.
+
+### Interactive XR room preview (#66–#68)
+
+The tracked preview instantiates the forge room and starts its OpenXR origin
+at the front. Physical walking uses ordinary headset tracking. Push the left
+thumbstick forward to aim and let it return to center to confirm the visible
+floor marker. The ray must remain in the room, miss station volumes, and land
+on clear floor. Teleport shifts the origin horizontally to align the head
+with the accepted marker and clears the hammer sweep.
+
+Joint-driven displays on both hands accept all available valid finger joints,
+whether provided by optical tracking or the native controller profile.
+Controller render models or simple grips are used without usable joint data.
+
+The hammer and a pair of tongs are separate world objects using a shared
+right-hand pickup state. A close grip or optical pinch picks up the nearest
+tool. Opening the grip or losing tracking releases it. A held hammer uses
+its tracked face trajectory, and release clears strike history. The left
+grip still handles billet placement. The tongs are a pick-up prop at this
+stage; they do not act on the billet. Hardware binding, feel, and comfort
+verification remain open in #66–#68.

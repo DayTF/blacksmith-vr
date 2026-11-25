@@ -102,6 +102,10 @@ func _build_stage() -> void:
 	var support_height := -0.03 - _stage_floor_y
 	_box(Vector3(0.075, support_height, 0.12), Vector3(0, -0.025 - support_height * 0.5, 0), Color("252e38"), 0.8)
 	_box(Vector3(2, 0.01, 2), Vector3(0, _stage_floor_y, 0), Color("171e27"), 0.0)
+	_build_visuals()
+
+
+func _build_visuals() -> void:
 	add_child(_surface)
 	add_child(_wire)
 	var metal := ShaderMaterial.new()

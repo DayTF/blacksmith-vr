@@ -30,6 +30,7 @@ def main():
         shutil.copytree(root / name, target / name, dirs_exist_ok=True)
     for name in ("project.godot", "icon.svg"):
         shutil.copy2(root / name, target / name)
+    shutil.copytree(root / "assets/forge_room", target / "assets/forge_room", dirs_exist_ok=True)
     if xr:
         project = target / "project.godot"
         config = project.read_text()
@@ -37,6 +38,7 @@ def main():
         config += ("\n[xr]\n\nopenxr/enabled=true\n"
                    "openxr/extensions/hand_tracking=true\n"
                    "openxr/extensions/hand_tracking_unobstructed_data_source=true\n"
+                   "openxr/extensions/hand_tracking_controller_data_source=true\n"
                    "openxr/extensions/render_model=true\n"
                    "shaders/enabled=true\n")
         if args.native:
