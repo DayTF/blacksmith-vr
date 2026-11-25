@@ -12,16 +12,18 @@ const SOLIDS := [
 const CONTACT_GAP := 0.0002
 
 
-static func constrain(bounds: AABB, previous: Transform3D, desired: Transform3D,
-		remote := false) -> Transform3D:
+static func fits(bounds: AABB, pose: Transform3D) -> bool:
+	var placed: AABB = pose * bounds
+	for solid: AABB in SOLIDS:
+		if solid.intersects(placed):
+			return false
+	return true
+
+
+static func constrain(bounds: AABB, previous: Transform3D, desired: Transform3D) -> Transform3D:
 	if previous.is_equal_approx(desired):
 		return previous
 	var extents: AABB = Transform3D(desired.basis, Vector3.ZERO) * bounds
-	if remote:
-		for solid: AABB in SOLIDS:
-			if solid.intersects(AABB(desired.origin + extents.position, extents.size)):
-				return previous
-		return desired
 
 	# Preserve the last fitting orientation when the requested rotation would
 	# overlap geometry before translation can begin.

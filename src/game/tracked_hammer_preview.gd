@@ -25,6 +25,8 @@ var _face_offset: Vector3
 var _tools := WorldTools.new()
 var _left_tools := WorldTools.new()
 var _pickup_beams: Array[MeshInstance3D] = []
+var _pickup_blockers: Array[Dictionary] = []
+var _point_rays: Array[Transform3D] = [Transform3D.IDENTITY, Transform3D.IDENTITY]
 var _point_targets := PackedInt32Array([-1, -1])
 var _point_age := PackedFloat64Array([INF, INF])
 var _teleport := Teleport.new()
@@ -154,6 +156,13 @@ func _build_tools() -> void:
 	]
 
 	_tools.tools.append_array(PropInventory.register(_room, self))
+	# Prop registration reparents the loose meshes, leaving only the fixed
+	# fixtures in the imported room. The tank surface is liquid, not a barrier.
+	var stage_from_world := global_transform.affine_inverse()
+	for mesh in _room.get_node("Room").find_children("*", "MeshInstance3D", true, false):
+		if mesh.name != &"Tank liquid surface":
+			_pickup_blockers.append({"pose": stage_from_world * mesh.global_transform,
+				"aim_bounds": mesh.get_aabb()})
 	_billet_tool = _tools.tools.size()
 	_tools.tools.append({"name": "Working billet", "kind": "billet", "pose": Transform3D.IDENTITY,
 		"aim_bounds": AABB(), "reach_m": _settings.billet_grab_reach_m})
@@ -253,6 +262,9 @@ func _constrain_tool(tool: Dictionary, desired: Transform3D, remote := false,
 		if remote or tool.get("remote_grip", false):
 			grip.origin -= grip.basis.z * _settings.remote_billet_offset_m
 		if acquiring:
+			if remote and not ForgeMotion.fits(tool.aim_bounds,
+					_room.transform.affine_inverse() * grip):
+				return null
 			_grab.release()
 			tool.remote_grip = remote
 			var anchor := grip
@@ -267,8 +279,10 @@ func _constrain_tool(tool: Dictionary, desired: Transform3D, remote := false,
 		return desired
 	var bounds := _tool_bounds(tool)
 	var room_from_stage := _room.transform.affine_inverse()
+	if remote:
+		return desired if ForgeMotion.fits(bounds, room_from_stage * desired) else null
 	return _room.transform * ForgeMotion.constrain(bounds, room_from_stage * tool.pose,
-		room_from_stage * desired, remote)
+		room_from_stage * desired)
 
 
 func _tool_bounds(tool: Dictionary) -> AABB:
@@ -288,15 +302,22 @@ func _update_tool_hand(hand: int, grip: RefCounted, unavailable: int, sample: Di
 		sample.pose = stage_from_world * sample.pose
 		var aim: Dictionary = _tracking.pickup_ray(hand == 1)
 		sample.trigger = aim.get("trigger", sample.pressure if sample.source == "hand" else 0.0)
-		var committing: bool = sample.trigger >= _settings.grab_press and _point_age[hand] <= 0.12 and _point_targets[hand] >= 0
-		if grip.held < 0 and aim.has("ray") and not committing and _teleport.active_hand != hand:
-			var ray: Transform3D = stage_from_world * aim.ray
-			var hit := IndexRay.nearest(ray, _tools.tools, 5.0, unavailable)
-			_point_targets[hand] = hit.target
-			_point_age[hand] = 0.0
-			_draw_beam(beam, ray.origin, -ray.basis.z.normalized(), hit.distance)
-		if _point_age[hand] <= 0.12:
-			sample.remote_target = _point_targets[hand]
+		if grip.held < 0 and _teleport.active_hand != hand:
+			if aim.has("ray"):
+				var ray: Transform3D = stage_from_world * aim.ray
+				var hit := IndexRay.nearest(ray, _tools.tools, 5.0, unavailable, _pickup_blockers)
+				_point_rays[hand] = ray
+				_point_targets[hand] = hit.target
+				_point_age[hand] = 0.0
+				_draw_beam(beam, ray.origin, -ray.basis.z.normalized(), hit.distance)
+				sample.remote_target = hit.target
+			elif sample.trigger >= _settings.grab_press 					and _point_age[hand] <= 0.12 and _point_targets[hand] >= 0:
+				# Pressing a trigger or pinching can curl the index finger. Recheck the last ray
+				# against the current objects without switching the aimed target.
+				var hit := IndexRay.nearest(_point_rays[hand], _tools.tools, 5.0,
+					unavailable, _pickup_blockers)
+				if hit.target == _point_targets[hand]:
+					sample.remote_target = hit.target
 	if grip.update(sample, _settings.grab_reach_m, _settings.grab_press, _settings.grab_release, unavailable):
 		_sweep.reset_tracking()
 		_point_targets[hand] = -1

@@ -1202,3 +1202,9 @@ the trigger. Carry it into the forge opening to heat it. Release the trigger
 or grip to set it down. The small hot blanks already in the hearth are loose
 stock props. A synthetic interaction fixture checks right-trigger pickup,
 measurable heating, release and left-grip pickup without headset hardware.
+
+The pickup ray clips at the first solid fixture in the imported room (#124).
+Loose meshes are registered separately and the quench surface permits pickup
+through the liquid. A fresh pointing ray wins on the trigger frame. If finger
+curl removes the ray, the short latch rechecks its original target against
+current geometry. A remote pickup into solid forge geometry is rejected.
