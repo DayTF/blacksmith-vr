@@ -1045,3 +1045,10 @@ The thermal solver exposes point-indexed `mean_temperature_rate_c_s`
 after each successful call. Failed calls clear both arrays. These
 measurements support tracking rapid changes for quench and hardening
 classification. The classification rule and tracked station wiring remain open.
+
+`ThermalModel.step_with_boundaries(nodes, links, contacts, dt)` accepts
+multiple contacts in one step (#85). Each contact has a data-defined
+`boundary` and a point-indexed `areas` array in square meters. The caller
+allocates each exposed patch only once. The solver sums boundary heat
+flows and conductances before applying the same adaptive timestep and
+pairwise conduction. The existing single-boundary `step` wraps this API.
