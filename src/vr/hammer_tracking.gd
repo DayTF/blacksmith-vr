@@ -1,6 +1,7 @@
 extends XROrigin3D
 ## OpenXR tracking adapter. Return a stage-space grip from either source.
 
+const IndexRay := preload("res://src/vr/index_pickup_ray.gd")
 const Fingers = preload("res://src/vr/tracked_hand_display.gd")
 
 const HAND := &"/user/hand_tracker/right"
@@ -13,6 +14,7 @@ const TRACKED := XRHandTracker.HAND_JOINT_FLAG_POSITION_TRACKED | XRHandTracker.
 var _controller := XRController3D.new()
 var _off_controller := XRController3D.new()
 var _aim := XRController3D.new()
+var _right_aim := XRController3D.new()
 var _camera: XRCamera3D
 var _right_fingers := Fingers.new()
 var _left_fingers := Fingers.new()
@@ -39,6 +41,9 @@ func _ready() -> void:
 	_aim.tracker = &"left_hand"
 	_aim.pose = &"aim"
 	add_child(_aim)
+	_right_aim.tracker = &"right_hand"
+	_right_aim.pose = &"aim"
+	add_child(_right_aim)
 	var grip_shape := CapsuleMesh.new()
 	grip_shape.radius = 0.022
 	grip_shape.height = 0.11
@@ -81,6 +86,43 @@ func off_hand(pinch_closed: float, pinch_open: float) -> Dictionary:
 
 func tool_hand(pinch_closed: float, pinch_open: float) -> Dictionary:
 	return _sample(HAND, _controller, pinch_closed, pinch_open)
+
+
+func pickup_ray(left: bool) -> Dictionary:
+	var controller := _off_controller if left else _controller
+	var result := {}
+	if controller.get_has_tracking_data():
+		var trigger := controller.get_float(&"trigger")
+		if is_zero_approx(trigger) and controller.is_button_pressed(&"trigger_click"):
+			trigger = 1.0
+		result.trigger = trigger
+	var hand := XRServer.get_tracker(OFF_HAND if left else HAND) as XRHandTracker
+	var joints := [XRHandTracker.HAND_JOINT_INDEX_FINGER_PHALANX_PROXIMAL,
+		XRHandTracker.HAND_JOINT_INDEX_FINGER_PHALANX_INTERMEDIATE, INDEX_TIP,
+		XRHandTracker.HAND_JOINT_MIDDLE_FINGER_PHALANX_PROXIMAL,
+		XRHandTracker.HAND_JOINT_MIDDLE_FINGER_PHALANX_INTERMEDIATE,
+		XRHandTracker.HAND_JOINT_MIDDLE_FINGER_TIP]
+	var valid := hand != null and hand.has_tracking_data
+	if valid:
+		for joint in joints:
+			if not (hand.get_hand_joint_flags(joint) & XRHandTracker.HAND_JOINT_FLAG_POSITION_VALID):
+				valid = false
+				break
+	if valid:
+		var positions: Array[Vector3] = []
+		for joint in joints:
+			positions.append(hand.get_hand_joint_transform(joint).origin)
+		if IndexRay.points(positions[0], positions[1], positions[2]) \
+				and not IndexRay.points(positions[3], positions[4], positions[5]):
+			var tip := Transform3D(Basis.IDENTITY, positions[2])
+			var direction := (positions[2] - positions[1]).normalized()
+			var up := Vector3.FORWARD if absf(direction.dot(Vector3.UP)) > 0.98 else Vector3.UP
+			result.ray = global_transform * XRServer.get_reference_frame() * tip.looking_at(tip.origin + direction, up)
+	else:
+		var fallback := _aim if left else _right_aim
+		if fallback.get_has_tracking_data():
+			result.ray = fallback.global_transform
+	return result
 
 
 func _sample(path: StringName, controller: XRController3D, pinch_closed: float, pinch_open: float) -> Dictionary:
