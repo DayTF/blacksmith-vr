@@ -136,3 +136,9 @@ uses an OpenXR hand joint when available and falls back to the right controller'
 grip pose. The fixture uses the runtime controller model when available and a simple grip
 proxy otherwise.
 Headset tracking, grip alignment and headset frame timing need a hardware pass.
+
+The larger XR fixture uses the native solver. With the extension built for
+your host, run `python3 tools/prepare_preview.py --xr --native` and open
+`.build/xr-preview-native/project.godot`. This fixture is 37.5 × 25 × 75 mm
+with 12.5 mm simulation spacing. The regular `--xr` project remains available
+as the smaller, native-free fixture.

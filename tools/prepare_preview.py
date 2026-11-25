@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""Stage the small GDScript-only desktop preview without a native build toolchain."""
+"""Stage the desktop or OpenXR development preview."""
 import argparse
 import shutil
 from pathlib import Path
+
+from prepare_native_import import register_extension
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--xr", action="store_true", help="Stage the tracked hammer OpenXR fixture.")
-    xr = parser.parse_args().xr
+    parser.add_argument("--native", action="store_true", help="Stage the larger XR billet and built native extension.")
+    args = parser.parse_args()
+    if args.native and not args.xr:
+        parser.error("--native requires --xr")
+    xr = args.xr
     root = Path(__file__).resolve().parent.parent
-    target = root / ".build" / ("xr-preview" if xr else "preview")
+    names = ("libblacksmith_native.so", "blacksmith_native.dll")
+    libraries = [root / "native/bin" / name for name in names]
+    libraries = [path for path in libraries if path.is_file()]
+    if args.native and not libraries:
+        parser.error("Build the native extension before staging the larger XR preview.")
+    folder = "xr-preview-native" if args.native else ("xr-preview" if xr else "preview")
+    target = root / ".build" / folder
     target.mkdir(parents=True, exist_ok=True)
     # Copy an explicit allow-list: no native extension, generated cache, credentials
     # or developer files are needed to run the reference solver's small fixture.
@@ -27,10 +39,19 @@ def main():
                    "openxr/extensions/hand_tracking_unobstructed_data_source=true\n"
                    "openxr/extensions/render_model=true\n"
                    "shaders/enabled=true\n")
+        if args.native:
+            config += "\n[blacksmith_preview]\n\nnative_solver=true\n"
         project.write_text(config)
+    if args.native:
+        (target / "native/bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / "native/blacksmith.gdextension", target / "native")
+        for library in libraries:
+            shutil.copy2(library, target / "native/bin")
+        register_extension(target, "res://native/blacksmith.gdextension")
     print(f"Preview ready: {target / 'project.godot'}")
     print("Open that project in Godot 4.7+ Standard and press F5.")
-    print("This small desktop fixture uses GDScript; no native build is required.")
+    if not args.native:
+        print("This small fixture uses GDScript; no native build is required.")
 
 
 if __name__ == "__main__":

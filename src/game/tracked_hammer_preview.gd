@@ -1,5 +1,6 @@
 extends "res://src/game/billet_preview.gd"
 
+const NativeBillet = preload("res://src/sim/native_granular_billet.gd")
 const TrackedHammer = preload("res://src/sim/tracked_hammer.gd")
 const HammerTracking = preload("res://src/vr/hammer_tracking.gd")
 
@@ -16,11 +17,22 @@ func _ready() -> void:
 	_settings = JSON.parse_string(FileAccess.get_file_as_string("res://data/preview/tracked_hammer.json"))
 	var offset: Array = _settings.grip_to_face_m
 	_face_offset = Vector3(offset[0], offset[1], offset[2])
+	var native: bool = ProjectSettings.get_setting("blacksmith_preview/native_solver", false)
+	if native and not ClassDB.class_exists("BlacksmithNativeCore"):
+		_setup_failed("The native mechanics library is unavailable in this staged preview.")
+		return
 	if not session.initialize():
 		_fail()
 		set_process(false)
 		return
 	session.config.dimensions = _settings.dimensions
+	if native:
+		session.billet_backend = NativeBillet
+		session.config.dimensions = _settings.native_dimensions
+		session.config.spacing_m = _settings.native_spacing_m
+		var d: Array = session.config.dimensions
+		var spacing: float = session.config.spacing_m
+		session.config.origin_m = [-0.5 * (d[0] - 1) * spacing, 0.0, -0.03 - 0.5 * (d[2] - 1) * spacing]
 	if not session.reset(session.temperature):
 		_fail()
 		set_process(false)
@@ -40,7 +52,12 @@ func _ready() -> void:
 	_hammer.hide()
 	if DisplayServer.get_name() == "headless":
 		if "--tracked-preview-smoke" in OS.get_cmdline_user_args():
-			get_tree().quit(int(session.strikes != 0))
+			if session.strikes != 0 or not session.billet.step(session.config.step_s):
+				_setup_failed("Tracked fixture failed its initial mechanics step.")
+				return
+			print("Tracked preview ready: ", session.billet.nodes.size(), " points, ",
+				"native" if native else "reference")
+			get_tree().quit()
 		else:
 			set_process(false)
 		return
@@ -54,6 +71,13 @@ func _ready() -> void:
 	add_child(_tracking)
 	get_viewport().use_xr = true
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+
+
+func _setup_failed(message: String) -> void:
+	push_error(message)
+	if DisplayServer.get_name() == "headless":
+		get_tree().quit(1)
+	set_process(false)
 
 
 func _add_hammer_handle() -> void:
@@ -101,12 +125,10 @@ func _process(delta: float) -> void:
 	for event: Dictionary in session.purification.events:
 		session.purified_nodes[event.node] = 1
 	session.step_ms = float(Time.get_ticks_usec() - started) / 1000.0
-	var hammer_transform := _hammer.transform
-	_refresh()
-	_hammer.transform = hammer_transform
+	var severed := _refresh(false)
 	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS" % [
 		_source if not _source.is_empty() else "Waiting for right-hand tracking",
-		session.strikes, session.summary().broken, session.step_ms, Engine.get_frames_per_second()]
+		session.strikes, severed, session.step_ms, Engine.get_frames_per_second()]
 	_frame_report += delta
 	if _frame_report >= 5.0:
 		_frame_report = 0.0

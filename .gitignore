@@ -10,3 +10,6 @@
 # Native build products and pinned dependency cache
 .build/
 native/bin/
+
+# Python tooling bytecode
+__pycache__/

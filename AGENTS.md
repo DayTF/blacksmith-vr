@@ -874,3 +874,23 @@ height with zero severed links. At full transfer they retained 10.87 mm
 with 13 severed links. Sweeps at 0.5 m/s still produced permanent strain.
 These are reproducible synthetic inputs. Steam Frame resistance needs a
 hardware retest.
+
+## Larger native XR fixture (#51)
+
+`python3 tools/prepare_preview.py --xr --native` stages
+`.build/xr-preview-native` with the built extension. The XR scene explicitly
+selects the native adapter for this project. The native-free `--xr` command
+still stages the original 30-point fixture at `.build/xr-preview`. The larger
+billet uses 84 points at 12.5 mm pitch, for dimensions 37.5 × 25 × 75 mm.
+Its initial mass is 169.46 g at the prescribed temperature, calculated by
+the existing density curve. Both fixtures retain their centered placement.
+The Windows link target now produces the manifest's DLL name with MinGW,
+and stages without extra MinGW runtime DLLs.
+
+Windows Godot 4.7.2 / Ryzen 9 5900X, with the 84-point native mutable-view
+fixture and six deterministic 1.5 m/s swings: 5.47 ms median for resting
+simulation and processes, 10.10 ms while working, and 0.91 ms for working
+mesh CPU updates. The 30-point reference fixture measured 10.08, 12.37,
+and 0.32 ms on the same host. All six swings landed in both, mass was
+conserved, and neither severed a link. The CPU timings exclude GPU and
+SteamVR compositor time. Steam Frame frame timing is pending.
