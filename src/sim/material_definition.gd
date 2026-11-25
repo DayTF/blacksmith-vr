@@ -10,6 +10,7 @@ var display_name := ""
 var raw_data: Dictionary = {}
 var _curves: Dictionary = {}
 var _phases: Array[Dictionary] = []
+var _quench_profile := {}
 
 
 func _init(data: Dictionary, defaults: Dictionary) -> void:
@@ -45,6 +46,10 @@ func phase_events(previous_temperature: float, temperature: float) -> Array[Dict
 	if not heating:
 		events.reverse()
 	return events
+
+
+func quench_profile() -> Dictionary:
+	return _quench_profile.duplicate()
 
 
 func has_property(property: String) -> bool:
@@ -90,6 +95,33 @@ func _configure(data: Dictionary, defaults: Dictionary) -> void:
 		if actual != null and (actual.width != reference.width or actual.vector_value != reference.vector_value):
 			errors.append("%s must preserve the default property's value shape." % property)
 	_configure_phases(data.get("phase_transitions", []), graphs)
+	if errors.is_empty():
+		_configure_quench(data.get("processes", {}).get("quench_hardening", {}))
+
+
+func _configure_quench(process: Dictionary) -> void:
+	if not process.get("enabled", false):
+		return
+	var markers := {}
+	for phase in _phases:
+		markers[phase.definition.id] = phase.temperature
+	var profile := {}
+	for key: String in ["heat", "start", "finish"]:
+		var marker: Variant = process.get(key + "_phase")
+		if not marker is String or not markers.has(marker):
+			errors.append("Quench hardening requires a valid %s phase marker." % key)
+			return
+		profile[key + "_phase"] = marker
+		profile[key + "_c"] = markers[marker]
+	if not (profile.heat_c > profile.start_c and profile.start_c > profile.finish_c):
+		errors.append("Quench phase temperatures must descend from heat to start to finish.")
+		return
+	var response: CurveGraph = _curves.get("processes.quench_hardening.fraction")
+	var context := {"temperature": profile.finish_c, "cooling_rate_c_s": 0.0}
+	if response == null or response.vector_value or not CurveGraph._number(response.sample(context)):
+		errors.append("Quench hardening requires a scalar fraction curve using temperature and cooling_rate_c_s.")
+		return
+	_quench_profile = profile
 
 
 func _validate_impurities(impurities: Variant, graphs: Dictionary) -> void:

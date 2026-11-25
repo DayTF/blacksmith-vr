@@ -5,6 +5,7 @@ const Library = preload("res://src/sim/material_library.gd")
 const Billet = preload("res://src/sim/granular_billet.gd")
 const Grid = preload("res://src/sim/billet_grid.gd")
 const Thermal = preload("res://src/sim/thermal_model.gd")
+const QuenchHardening := preload("res://src/sim/quench_hardening.gd")
 const NamedSnapshot := preload("res://src/sim/named_billet_snapshot.gd")
 const Purification = preload("res://src/sim/forging_purification.gd")
 var materials := Library.new()
@@ -32,6 +33,7 @@ var phase_count: int:
 	get: return _thermal_crossings.size()
 var thermal_elapsed_s := 0.0
 var peak_cooling_rate_c_s := PackedFloat64Array()
+var _quench_hardening: RefCounted
 var _thermal_crossings: Array[Dictionary] = []
 var purification: RefCounted
 var purified_nodes := PackedByteArray()
@@ -59,6 +61,7 @@ func reset(prescribed_temperature: float) -> bool:
 	thermal_elapsed_s = 0.0
 	peak_cooling_rate_c_s.clear()
 	_thermal_crossings.clear()
+	_quench_hardening = QuenchHardening.new(materials)
 	purification = Purification.new(JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json")))
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	billet = billet_backend.new(materials, tuning)
@@ -154,13 +157,16 @@ func inspect_environment(index: int) -> void:
 func step_thermal(contacts: Array[Dictionary], dt: float) -> bool:
 	if solidified or billet == null:
 		return false
-	if not thermal.step_with_boundaries(billet.nodes, billet.connections, contacts, dt):
+	var nodes: Array[Dictionary] = billet.nodes
+	_quench_hardening.prepare(nodes)
+	if not thermal.step_with_boundaries(nodes, billet.connections, contacts, dt):
 		errors = thermal.errors
 		return false
 	for event: Dictionary in thermal.phase_events:
 		var record := event.duplicate(true)
 		record["thermal_time_s"] = thermal_elapsed_s + float(event.step_offset_s)
 		_thermal_crossings.append(record)
+		_quench_hardening.observe(record, record.thermal_time_s)
 	var rates: PackedFloat64Array = thermal.peak_cooling_rate_c_s
 	peak_cooling_rate_c_s.resize(rates.size())
 	for index in rates.size():
@@ -177,6 +183,7 @@ func solidify(item_name: String) -> RefCounted:
 		"strikes": strikes, "elapsed_s": elapsed, "phase_events": phase_count,
 		"thermal_elapsed_s": thermal_elapsed_s, "thermal_crossings": _thermal_crossings,
 		"peak_cooling_rate_c_s": peak_cooling_rate_c_s,
+		"quench_hardening_by_point": _quench_hardening.outcomes(),
 	})
 	_solidified = true
 	return item
