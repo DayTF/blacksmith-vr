@@ -981,3 +981,12 @@ its tracked face trajectory, and release clears strike history. The left
 grip still handles billet placement. The tongs are a pick-up prop at this
 stage; they do not act on the billet. Hardware binding, feel, and comfort
 verification remain open in #66–#68.
+
+## Quench tank surface presentation (#71)
+
+The shared forge room wraps the imported tank liquid mesh with a Forward+
+shader. The room's `set_quench_medium(medium_id)` adapter accepts the existing
+`water` and `oil` thermal environment IDs. Water is the default presentation.
+Run `scenes/forge_room_study.tscn -- --room-oil` to inspect the oil preset.
+This preview flag selects an appearance. Equipment contact and tracked
+quenching remain part of #16.

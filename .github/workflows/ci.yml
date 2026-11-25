@@ -131,6 +131,7 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 2>&1 | tee "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 -- --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/forge-room.log"; then
             exit 1
           fi
