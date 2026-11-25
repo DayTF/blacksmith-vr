@@ -1143,3 +1143,11 @@ averages over committed steps for the synthetic Mithril fixture. These
 values are not local plastic strain, substep peaks or headset measurements.
 The 0.5 and 1.5 m/s replays peaked at 0.0093 and 0.0386 true strain.
 Neither replay had a compressive interval inside all published fit bounds.
+
+The copper thermal coupon (#108) uses `data/research/copper_thermal_reference.json`
+and the same thermal solver as the game. Run
+`godot --headless --script tests/measure_copper_conduction.gd -- 100 900`
+with two starting temperatures in Celsius. The fixture checks heat-flow
+direction, thermal equilibrium and internal energy drift with insulation.
+Conductivity uses the RRR 100 reference column and heat capacity uses
+elemental solid copper. It is a thermal reference outside the playable catalog.

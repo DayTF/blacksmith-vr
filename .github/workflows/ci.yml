@@ -79,6 +79,9 @@ jobs:
       - name: Measure tracked fixture compression
         run: godot --headless --path . --script tests/measure_tracked_compression.gd
 
+      - name: Verify the sourced copper conduction coupon
+        run: godot --headless --path . --script tests/measure_copper_conduction.gd
+
       - name: Run the headless M0 forging replay
         shell: bash
         run: |
