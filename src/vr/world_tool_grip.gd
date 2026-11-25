@@ -49,10 +49,19 @@ func update(sample: Dictionary, reach: float, press: float, release: float, unav
 			for index in tools.size():
 				if index == unavailable:
 					continue
-				var distance: float = tools[index].pose.origin.distance_squared_to(pose.origin)
+				var distance := _distance_squared(tools[index], pose.origin)
 				if distance <= nearest:
 					nearest = distance
 					held = index
 	if held >= 0:
 		tools[held].pose = pose.orthonormalized()
 	return held != previous
+
+func _distance_squared(tool: Dictionary, point: Vector3) -> float:
+	var pose: Transform3D = tool.pose
+	if not tool.has("aim_bounds"):
+		return pose.origin.distance_squared_to(point)
+	var box: AABB = tool.aim_bounds
+	var local := pose.affine_inverse() * point
+	var nearest := local.clamp(box.position, box.end)
+	return point.distance_squared_to(pose * nearest)

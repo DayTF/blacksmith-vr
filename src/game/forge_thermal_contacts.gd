@@ -64,6 +64,8 @@ static func support_height(room_position: Vector3) -> float:
 		return TANK_RIM_HEIGHT_M
 	if ANVIL_FACE.has_point(footprint):
 		return ANVIL_HEIGHT_M
+	if Rect2(-1.875, -0.52, 0.63, 1.34).has_point(footprint):
+		return 0.88
 	if Rect2(-1.30, -2.92, 1.64, 0.94).has_point(footprint):
 		return FIRE.position.y
 	return 0.0
