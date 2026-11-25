@@ -1093,3 +1093,22 @@ records these events against its cumulative thermal time and retains peak
 local cooling rates. Naming copies the history into the static item record.
 The timing can support material-specific cooling windows and hardening
 rules. The history itself does not alter material hardness.
+
+## Material-specific quench hardening preview (#94)
+
+A material may opt into `processes.quench_hardening`. It names three
+descending temperature markers in `phase_transitions` using `heat_phase`,
+`start_phase` and `finish_phase`. The `fraction` curve takes the mean local
+rate `cooling_rate_c_s` through that window and its finish temperature.
+A point must qualify at the heat marker first. Reheating through that heat
+marker clears its previous outcome. Naming retains per-point fractions,
+rates and durations from completed windows. Heating, cooling and the
+outcome are evaluated by material data and thermal history.
+
+Embersteel uses provisional fantasy tuning. Its test fixture produces
+distinct outcomes for air, oil and water. The window model is a simplified
+approximation inspired by measured cooling histories
+([OSTI phase transformation report](https://www.osti.gov/servlets/purl/850544-VqE45c/)).
+It does not model soak kinetics, tempering, or the full transformation
+diagram. Converting the outcome into material properties and final item
+statistics remains in #17.

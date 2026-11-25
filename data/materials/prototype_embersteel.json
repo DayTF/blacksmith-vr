@@ -79,7 +79,26 @@
       ]
     }
   },
+  "phase_transitions": [
+    {"id": "quench_heat", "temperature": 900, "modifiers": {}},
+    {"id": "quench_window_start", "temperature": 800, "modifiers": {}},
+    {"id": "quench_window_finish", "temperature": 500, "modifiers": {}}
+  ],
   "processes": {
+    "quench_hardening": {
+      "enabled": true,
+      "description": "Provisional fantasy tuning. The intervals and response are not calibrated steel data.",
+      "heat_phase": "quench_heat",
+      "start_phase": "quench_window_start",
+      "finish_phase": "quench_window_finish",
+      "curves": {
+        "fraction": {
+          "axis": "cooling_rate_c_s",
+          "interpolation": "linear",
+          "keys": [[8, 0], [45, 1]]
+        }
+      }
+    },
     "melting": {
       "enabled": false,
       "reason": "Prototype alloy retains its impurity inclusions; forging is required.",
