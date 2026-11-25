@@ -72,6 +72,7 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 	var peak_cooling := PackedFloat64Array()
 	peak_cooling.resize(nodes.size())
 	var remaining := dt
+	var elapsed := 0.0
 	var substeps := 0
 	var events: Array[Dictionary] = []
 	var solidified := {}
@@ -168,11 +169,15 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 			for event: Dictionary in material.phase_events(previous, next):
 				var local := event.duplicate(true)
 				local["node"] = index
+				var fraction := clampf((float(local.temperature) - previous) / (next - previous), 0.0, 1.0)
+				local["step_offset_s"] = elapsed + fraction * h
+				local["temperature_rate_c_s"] = (next - previous) / h
 				events.append(local)
 			external_energy += boundary_power[index] * h
 			temperatures[index] = next
 			strains[index] = strain
 		remaining -= h
+		elapsed += h
 	if not is_finite(external_energy):
 		return _fail("Nonfinite boundary energy; state retained.")
 	var mean_rates := PackedFloat64Array()
@@ -186,6 +191,11 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 		nodes[index].plastic_strain = strains[index]
 	for index in solidified:
 		nodes[index].erase("separated_impurities")
+	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a.step_offset_s == b.step_offset_s:
+			return a.node < b.node
+		return a.step_offset_s < b.step_offset_s
+	)
 	phase_events = events
 	boundary_energy_j = external_energy
 	mean_temperature_rate_c_s = mean_rates

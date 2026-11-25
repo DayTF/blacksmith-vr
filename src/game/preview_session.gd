@@ -28,7 +28,11 @@ var thermal_inspection := false
 var environments: Dictionary
 var boundary: Dictionary
 var exposed_areas := PackedFloat64Array()
-var phase_count := 0
+var phase_count: int:
+	get: return _thermal_crossings.size()
+var thermal_elapsed_s := 0.0
+var peak_cooling_rate_c_s := PackedFloat64Array()
+var _thermal_crossings: Array[Dictionary] = []
 var purification: RefCounted
 var purified_nodes := PackedByteArray()
 var initial_impurity_mass := 0.0
@@ -52,7 +56,9 @@ func reset(prescribed_temperature: float) -> bool:
 	thermal = Thermal.new(materials, JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/thermal.json")))
 	thermal_inspection = false
 	boundary = environments.environments[0]
-	phase_count = 0
+	thermal_elapsed_s = 0.0
+	peak_cooling_rate_c_s.clear()
+	_thermal_crossings.clear()
 	purification = Purification.new(JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json")))
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
 	billet = billet_backend.new(materials, tuning)
@@ -109,11 +115,8 @@ func advance(delta: float) -> bool:
 		if strikes == _last_sequence_strike:
 			_sequence_end_at = elapsed + float(config.settle_s)
 	var started := Time.get_ticks_usec()
-	if thermal_inspection:
-		if not thermal.step(billet.nodes, billet.connections, exposed_areas, config.step_s, boundary):
-			errors = thermal.errors
-			return false
-		phase_count += thermal.phase_events.size()
+	if thermal_inspection and not step_thermal([{"areas": exposed_areas, "boundary": boundary}], config.step_s):
+		return false
 	if not billet.step(config.step_s):
 		errors = billet.errors
 		return false
@@ -148,12 +151,32 @@ func inspect_environment(index: int) -> void:
 	finished = false
 
 
+func step_thermal(contacts: Array[Dictionary], dt: float) -> bool:
+	if solidified or billet == null:
+		return false
+	if not thermal.step_with_boundaries(billet.nodes, billet.connections, contacts, dt):
+		errors = thermal.errors
+		return false
+	for event: Dictionary in thermal.phase_events:
+		var record := event.duplicate(true)
+		record["thermal_time_s"] = thermal_elapsed_s + float(event.step_offset_s)
+		_thermal_crossings.append(record)
+	var rates: PackedFloat64Array = thermal.peak_cooling_rate_c_s
+	peak_cooling_rate_c_s.resize(rates.size())
+	for index in rates.size():
+		peak_cooling_rate_c_s[index] = maxf(peak_cooling_rate_c_s[index], rates[index])
+	thermal_elapsed_s += dt
+	return true
+
+
 func solidify(item_name: String) -> RefCounted:
 	var name := item_name.strip_edges()
 	if solidified or billet == null or name.is_empty() or not errors.is_empty():
 		return null
 	var item := NamedSnapshot.new(name, billet, {
 		"strikes": strikes, "elapsed_s": elapsed, "phase_events": phase_count,
+		"thermal_elapsed_s": thermal_elapsed_s, "thermal_crossings": _thermal_crossings,
+		"peak_cooling_rate_c_s": peak_cooling_rate_c_s,
 	})
 	_solidified = true
 	return item
