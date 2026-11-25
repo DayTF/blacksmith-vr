@@ -908,3 +908,18 @@ The desktop diagnostic view retains its existing wire overlay.
 The 84-point Windows headless working replay measured 1.89 ms median for
 rounded mesh CPU updates, compared with 0.91 ms for the previous faceted mesh.
 The Windows Forward+ capture is in `docs/previews/rounded-xr-billet.png`.
+
+## Tracked billet placement (#50)
+
+The XR preview acquires the nearest connected piece within 50 mm when the
+left grip crosses its press threshold. Optical hand tracking supplies a
+thumb/index pinch when available. Release and tracking-source changes
+drop the piece and invalidate the hammer sweep history. A new grip must
+first open after tracking reconnects. The carried lattice uses a rigid
+transform, preserves material state, and stays above the existing anvil
+plane. The preview pauses mechanical and process stepping while held.
+Release resumes gravity with zero carried velocity. Detached debris is
+outside the selected connected component.
+
+Headless tests cover both mechanics backends. Steam Frame controller
+binding, placement feel and headset performance remain hardware checks.
