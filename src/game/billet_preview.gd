@@ -185,10 +185,27 @@ func _cache_faces() -> void:
 	_faces = boundary.values()
 
 
-func _refresh() -> void:
+func _refresh(update_controls: bool = true) -> int:
 	var nodes: Array = session.billet.nodes
 	var links: Array[Dictionary] = session.billet.connections
 	var severed := FractureGeometry.broken_pairs(links)
+	var colors := PackedColorArray()
+	var emissions := PackedFloat32Array()
+	var temperatures := {}
+	for node: Dictionary in nodes:
+		var key := [node.material_id, node.temperature]
+		if not temperatures.has(key):
+			var state := {"temperature": node.temperature}
+			var rgb: PackedFloat64Array = session.materials.sample(node.material_id, "color", state)
+			var energy: float = session.materials.sample(node.material_id, "emission_energy", state)
+			temperatures[key] = [Color(rgb[0], rgb[1], rgb[2]), energy]
+		var sample: Array = temperatures[key]
+		var color: Color = sample[0]
+		if layered_replay:
+			var tint := Color("94baff") if node.layer_id == "leaf" else Color("ffc473")
+			color = color.lerp(tint, 0.6)
+		colors.append(color)
+		emissions.append(sample[1] * session.config.emission_scale)
 	var triangles := SurfaceTool.new()
 	triangles.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for face: Array in _faces:
@@ -198,17 +215,10 @@ func _refresh() -> void:
 			var c: Vector3 = nodes[triangle[2]].position
 			var normal := (b - a).cross(c - a).normalized()
 			for id: int in triangle:
-				var node: Dictionary = nodes[id]
-				var rgb: PackedFloat64Array = session.materials.sample(node.material_id, "color", {"temperature": node.temperature})
-				var emission: float = session.materials.sample(node.material_id, "emission_energy", {"temperature": node.temperature}) * session.config.emission_scale
-				triangles.set_uv2(Vector2(emission, 0))
+				triangles.set_uv2(Vector2(emissions[id], 0))
 				triangles.set_normal(normal)
-				var color := Color(rgb[0], rgb[1], rgb[2])
-				if layered_replay:
-					var tint := Color("94baff") if node.layer_id == "leaf" else Color("ffc473")
-					color = color.lerp(tint, 0.6)
-				triangles.set_color(color)
-				triangles.add_vertex(node.position)
+				triangles.set_color(colors[id])
+				triangles.add_vertex(nodes[id].position)
 	_surface.mesh = triangles.commit()
 	var lines := SurfaceTool.new()
 	lines.begin(Mesh.PRIMITIVE_LINES)
@@ -228,9 +238,8 @@ func _refresh() -> void:
 			if bonded[index]:
 				continue
 			var fragment: Dictionary = nodes[index]
-			var rgb: PackedFloat64Array = session.materials.sample(fragment.material_id, "color", {"temperature": fragment.temperature})
 			_fragments.multimesh.set_instance_transform(fragment_count, Transform3D(Basis.IDENTITY, fragment.position))
-			_fragments.multimesh.set_instance_color(fragment_count, Color(rgb[0], rgb[1], rgb[2]))
+			_fragments.multimesh.set_instance_color(fragment_count, colors[index])
 			fragment_count += 1
 	_fragments.multimesh.visible_instance_count = fragment_count
 	var marker_count := 0
@@ -240,11 +249,13 @@ func _refresh() -> void:
 			_purification_sites.multimesh.set_instance_transform(marker_count, Transform3D(Basis.IDENTITY, nodes[index].position))
 			marker_count += 1
 	_purification_sites.multimesh.visible_instance_count = marker_count
+	if not update_controls:
+		return severed.size()
 	if layered_replay:
 		_hammer.position = session.contact + Vector3.UP * session.hammer_height()
 		_status.text = "%s\n\n%d contacts under the hammer\n%d bonded patches\n\nGold · Mithril base\nBlue · Embersteel leaf\nMint · Bonded patch" % [
 			"Paused" if session.paused else session.stage, session.contacting_patches, session.bonded_patches]
-		return
+		return severed.size()
 	var phase: float = fmod(session.elapsed, session.config.strike_interval_s) / session.config.strike_interval_s
 	_hammer.position = session.contact + Vector3.UP * (0.01 + session.config.hammer_lift_m * sin(phase * PI))
 	if session.finished or session.thermal_inspection:
@@ -255,6 +266,8 @@ func _refresh() -> void:
 		summary.temperature_mean, summary.temperature_min, summary.temperature_max, summary.nodes, session.strikes, summary.broken, summary.strain,
 		summary.impurity_mass_kg * 1e6, summary.discarded_mass_kg * 1e9, summary.purified_nodes, session.step_ms,
 		"Paused" if session.paused else ("Thermal inspection · " + session.boundary.id if session.thermal_inspection else ("Demo complete — replay or inspect" if session.finished else "Synthetic impacts · constant temperature"))]
+
+	return severed.size()
 
 
 func _build_ui() -> void:

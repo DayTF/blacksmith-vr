@@ -112,3 +112,14 @@ jobs:
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/tracked-preview.log"; then
             exit 1
           fi
+
+      - name: Verify the larger native XR fixture
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/prepare_preview.py --xr --native
+          godot --headless --xr-mode off --path .build/xr-preview-native -- --tracked-preview-smoke 2>&1 | tee "$RUNNER_TEMP/native-xr.log"
+          grep -q 'Tracked preview ready: 84 points, native' "$RUNNER_TEMP/native-xr.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/native-xr.log"; then
+            exit 1
+          fi

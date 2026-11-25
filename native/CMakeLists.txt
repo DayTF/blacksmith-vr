@@ -23,6 +23,12 @@ if(BLACKSMITH_BUILD_EXTENSION)
   FetchContent_MakeAvailable(godot_cpp)
   add_library(blacksmith_native SHARED src/extension.cpp)
   target_link_libraries(blacksmith_native PRIVATE blacksmith_solver godot-cpp)
+  if(WIN32)
+    set_target_properties(blacksmith_native PROPERTIES PREFIX "")
+    if(MINGW)
+      target_link_options(blacksmith_native PRIVATE -static-libgcc -static-libstdc++ -static)
+    endif()
+  endif()
   set_target_properties(blacksmith_native PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")

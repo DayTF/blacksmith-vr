@@ -7,6 +7,7 @@ const Grid = preload("res://src/sim/billet_grid.gd")
 const Thermal = preload("res://src/sim/thermal_model.gd")
 const Purification = preload("res://src/sim/forging_purification.gd")
 var materials := Library.new()
+var billet_backend: Script = Billet
 var billet: RefCounted
 var config: Dictionary
 var errors := PackedStringArray()
@@ -50,7 +51,7 @@ func reset(prescribed_temperature: float) -> bool:
 	phase_count = 0
 	purification = Purification.new(JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/surface.json")))
 	var tuning: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/sim/mechanics.json"))
-	billet = Billet.new(materials, tuning)
+	billet = billet_backend.new(materials, tuning)
 	var d: Array = config.dimensions
 	var o: Array = config.origin_m
 	if not billet.build_grid(Vector3i(d[0], d[1], d[2]), config.spacing_m,
