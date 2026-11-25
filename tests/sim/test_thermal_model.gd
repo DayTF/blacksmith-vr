@@ -22,6 +22,7 @@ func run() -> PackedStringArray:
 	_test_phase_recovery_and_atomicity()
 	_test_exposure()
 	_test_cooling_rates()
+	_test_simultaneous_boundaries()
 	return failures
 
 
@@ -155,3 +156,22 @@ func _test_cooling_rates() -> void:
 	_expect(not model.step(nodes, _no_links, areas, -dt, _boundary()), "Invalid step is rejected")
 	_expect(model.mean_temperature_rate_c_s.is_empty() and model.peak_cooling_rate_c_s.is_empty(),
 		"Failed steps expose no thermal rates")
+
+
+func _test_simultaneous_boundaries() -> void:
+	var model := _model(_fixture())
+	var nodes: Array[Dictionary] = [_node(100), _node(100)]
+	var contacts: Array[Dictionary] = [
+		{"areas": PackedFloat64Array([1, 0.5]), "boundary": _boundary()},
+		{"areas": PackedFloat64Array([0, 0.5]), "boundary": _boundary("quench_water", 40.0)},
+	]
+	_expect(model.step_with_boundaries(nodes, _no_links, contacts, 0.02), "Partial immersion steps")
+	_near(nodes[0].temperature, 99.84, 1e-8, "Dry point exchanges only with air")
+	_near(nodes[1].temperature, 93.92, 1e-8, "Immersed point exchanges with both assigned areas")
+	_near(model.boundary_energy_j, -62.4, 1e-8, "Both boundaries account for the lost heat")
+	_near(model.peak_cooling_rate_c_s[1], 304.0, 1e-8, "Local rate includes both boundaries")
+	var before := nodes.duplicate(true)
+	contacts[1].areas = PackedFloat64Array([0.0, -0.5])
+	_expect(not model.step_with_boundaries(nodes, _no_links, contacts, 0.02),
+		"Invalid contact area rejects the entire step")
+	_expect(before == nodes, "Failed mixed contact leaves every point unchanged")

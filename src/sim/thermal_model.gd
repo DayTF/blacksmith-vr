@@ -18,6 +18,11 @@ func _init(library: RefCounted, parameters: Dictionary) -> void:
 
 func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: PackedFloat64Array,
 		dt: float, boundary: Dictionary) -> bool:
+	return step_with_boundaries(nodes, links, [{"areas": exposed_areas, "boundary": boundary}], dt)
+
+
+func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
+		contacts: Array[Dictionary], dt: float) -> bool:
 	errors.clear()
 	phase_events.clear()
 	boundary_energy_j = 0.0
@@ -25,20 +30,31 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 	peak_cooling_rate_c_s.clear()
 	if not _valid_parameters() or not _number(dt) or dt <= 0.0 or dt > tuning.maximum_step_s:
 		return _fail("Invalid thermal timestep or tuning.")
-	if exposed_areas.size() != nodes.size() or not _number(boundary.get("temperature_c")) or not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
-		return _fail("Invalid thermal boundary or exposure array.")
-	var ambient: float = boundary.temperature_c
-	if boundary.has("maximum_temperature_c"):
-		if not _number(boundary.maximum_temperature_c):
-			return _fail("Invalid equipment temperature cap.")
-		ambient = minf(ambient, boundary.maximum_temperature_c)
-	if ambient < -float(tuning.kelvin_offset):
-		return _fail("Thermal boundary is below absolute zero.")
+	var boundaries: Array[Dictionary] = []
+	for contact in contacts:
+		if not contact.get("areas") is PackedFloat64Array or not contact.get("boundary") is Dictionary:
+			return _fail("Invalid thermal contact.")
+		var areas: PackedFloat64Array = contact.areas
+		var boundary: Dictionary = contact.boundary
+		if areas.size() != nodes.size() or not _number(boundary.get("temperature_c")) or not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
+			return _fail("Invalid thermal boundary or exposure array.")
+		for area in areas:
+			if not _number(area) or area < 0.0:
+				return _fail("Invalid thermal exposure area.")
+		var ambient: float = boundary.temperature_c
+		if boundary.has("maximum_temperature_c"):
+			if not _number(boundary.maximum_temperature_c):
+				return _fail("Invalid equipment temperature cap.")
+			ambient = minf(ambient, boundary.maximum_temperature_c)
+		if ambient < -float(tuning.kelvin_offset):
+			return _fail("Thermal boundary is below absolute zero.")
+		boundaries.append({"areas": areas, "temperature": ambient,
+			"property": boundary.coefficient_property, "scale": boundary.coefficient_scale})
 	var temperatures := PackedFloat64Array()
 	var strains := PackedFloat64Array()
 	for index in nodes.size():
 		var node := nodes[index]
-		if not _number(node.get("temperature")) or node.temperature < -float(tuning.kelvin_offset) or not _number(node.get("mass")) or node.mass <= 0 or not _number(node.get("plastic_strain")) or node.plastic_strain < 0 or not node.get("position") is Vector3 or not node.position.is_finite() or not _number(exposed_areas[index]) or exposed_areas[index] < 0:
+		if not _number(node.get("temperature")) or node.temperature < -float(tuning.kelvin_offset) or not _number(node.get("mass")) or node.mass <= 0 or not _number(node.get("plastic_strain")) or node.plastic_strain < 0 or not node.get("position") is Vector3 or not node.position.is_finite():
 			return _fail("Invalid local thermal state.")
 		if materials.get_material(node.get("material_id", "")) == null:
 			return _fail("Unknown thermal material.")
@@ -61,7 +77,7 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 		var capacities := PackedFloat64Array()
 		var conductivities := PackedFloat64Array()
 		var recovery := PackedFloat64Array()
-		var boundary_g := PackedFloat64Array()
+		var boundary_power := PackedFloat64Array()
 		var totals := PackedFloat64Array()
 		var power := PackedFloat64Array()
 		totals.resize(nodes.size())
@@ -70,7 +86,7 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 		for index in nodes.size():
 			var state := {"temperature": temperatures[index], "plastic_strain": strains[index]}
 			var properties := {}
-			for property in ["specific_heat", "thermal_conductivity", "emissivity", "work_hardening_recovery", boundary.coefficient_property]:
+			for property in ["specific_heat", "thermal_conductivity", "emissivity", "work_hardening_recovery"]:
 				var value: Variant = materials.sample(nodes[index].material_id, property, state)
 				if not _number(value) or value < 0:
 					return _fail("Invalid thermal curve: " + str(property))
@@ -82,15 +98,24 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 			conductivities.append(properties.thermal_conductivity)
 			recovery.append(properties.work_hardening_recovery)
 			var tk: float = temperatures[index] + tuning.kelvin_offset
-			var ak: float = ambient + tuning.kelvin_offset
-			# Factor T^4 - A^4 to obtain an exact, nonnegative frozen conductance.
-			var radiation: float = properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
-			var g: float = exposed_areas[index] * (properties[boundary.coefficient_property] * boundary.coefficient_scale + radiation)
-			if not is_finite(g):
-				return _fail("Nonfinite thermal boundary conductance.")
-			boundary_g.append(g)
-			totals[index] = g
-			power[index] = g * (ambient - temperatures[index])
+			var net_power := 0.0
+			for boundary in boundaries:
+				var property: String = boundary.property
+				if not properties.has(property):
+					var coefficient: Variant = materials.sample(nodes[index].material_id, property, state)
+					if not _number(coefficient) or coefficient < 0.0:
+						return _fail("Invalid thermal curve: " + property)
+					properties[property] = float(coefficient)
+				var ak: float = boundary.temperature + tuning.kelvin_offset
+				# Factor the fourth-power difference into a frozen conductance.
+				var radiation: float = properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
+				var g: float = boundary.areas[index] * (properties[property] * boundary.scale + radiation)
+				if not is_finite(g):
+					return _fail("Nonfinite thermal boundary conductance.")
+				totals[index] += g
+				net_power += g * (float(boundary.temperature) - temperatures[index])
+			boundary_power.append(net_power)
+			power[index] = net_power
 		for link: Dictionary in links:
 			if link.get("broken", false):
 				continue
@@ -133,7 +158,7 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 				var local := event.duplicate(true)
 				local["node"] = index
 				events.append(local)
-			external_energy += boundary_g[index] * (ambient - previous) * h
+			external_energy += boundary_power[index] * h
 			temperatures[index] = next
 			strains[index] = strain
 		remaining -= h
