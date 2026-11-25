@@ -21,6 +21,7 @@ func run() -> PackedStringArray:
 	_test_boundaries_and_caps()
 	_test_phase_recovery_and_atomicity()
 	_test_exposure()
+	_test_cooling_rates()
 	return failures
 
 
@@ -135,3 +136,22 @@ func _expect(condition: bool, message: String) -> void:
 
 func _near(actual: float, expected: float, tolerance: float, message: String) -> void:
 	_expect(absf(actual - expected) <= tolerance, message + ": " + str(actual))
+
+
+func _test_cooling_rates() -> void:
+	var model := _model(_fixture())
+	var nodes: Array[Dictionary] = [_node(100), _node(0), _node(100)]
+	var areas := PackedFloat64Array([10.0, 10.0, 0.0])
+	var dt := 0.02
+	_expect(model.step(nodes, _no_links, areas, dt, _boundary("quench_water")), "Rate fixture steps")
+	_near(model.peak_cooling_rate_c_s[0], 8000.0, 1e-8, "Peak cooling records the fastest substep")
+	_near(model.mean_temperature_rate_c_s[0], (nodes[0].temperature - 100.0) / dt, 1e-8,
+		"Mean rate matches the full-step temperature change")
+	_expect(-model.mean_temperature_rate_c_s[0] < model.peak_cooling_rate_c_s[0],
+		"Fast substep cooling is retained above the full-step mean")
+	_expect(model.mean_temperature_rate_c_s[1] > 0.0 and model.peak_cooling_rate_c_s[1] == 0.0,
+		"Heating is not counted as cooling")
+	_near(model.mean_temperature_rate_c_s[2], 0.0, 1e-12, "Insulated point has zero rate")
+	_expect(not model.step(nodes, _no_links, areas, -dt, _boundary()), "Invalid step is rejected")
+	_expect(model.mean_temperature_rate_c_s.is_empty() and model.peak_cooling_rate_c_s.is_empty(),
+		"Failed steps expose no thermal rates")

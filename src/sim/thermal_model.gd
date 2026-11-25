@@ -7,6 +7,8 @@ var tuning: Dictionary
 var errors := PackedStringArray()
 var phase_events: Array[Dictionary] = []
 var boundary_energy_j := 0.0
+var mean_temperature_rate_c_s := PackedFloat64Array()
+var peak_cooling_rate_c_s := PackedFloat64Array()
 
 
 func _init(library: RefCounted, parameters: Dictionary) -> void:
@@ -19,6 +21,8 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 	errors.clear()
 	phase_events.clear()
 	boundary_energy_j = 0.0
+	mean_temperature_rate_c_s.clear()
+	peak_cooling_rate_c_s.clear()
 	if not _valid_parameters() or not _number(dt) or dt <= 0.0 or dt > tuning.maximum_step_s:
 		return _fail("Invalid thermal timestep or tuning.")
 	if exposed_areas.size() != nodes.size() or not _number(boundary.get("temperature_c")) or not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
@@ -43,6 +47,8 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 	for link: Dictionary in links:
 		if not link.get("a") is int or not link.get("b") is int or link.a < 0 or link.b < 0 or link.a >= nodes.size() or link.b >= nodes.size() or link.a == link.b or not _number(link.get("thermal_area_m2", link.get("area"))) or link.get("thermal_area_m2", link.get("area")) < 0:
 			return _fail("Invalid heat connection.")
+	var peak_cooling := PackedFloat64Array()
+	peak_cooling.resize(nodes.size())
 	var remaining := dt
 	var substeps := 0
 	var events: Array[Dictionary] = []
@@ -111,6 +117,8 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 		for index in nodes.size():
 			var previous: float = temperatures[index]
 			var next: float = previous + power[index] * h / capacities[index]
+			var cooling_rate := maxf(0.0, -power[index] / capacities[index])
+			peak_cooling[index] = maxf(peak_cooling[index], cooling_rate)
 			var strain: float = strains[index] * exp(-recovery[index] * h)
 			if not is_finite(next) or not is_finite(strain):
 				return _fail("Nonfinite thermal result; state retained.")
@@ -131,6 +139,12 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 		remaining -= h
 	if not is_finite(external_energy):
 		return _fail("Nonfinite boundary energy; state retained.")
+	var mean_rates := PackedFloat64Array()
+	for index in nodes.size():
+		var rate: float = (temperatures[index] - float(nodes[index].temperature)) / dt
+		if not is_finite(rate) or not is_finite(peak_cooling[index]):
+			return _fail("Nonfinite thermal rate; state retained.")
+		mean_rates.append(rate)
 	for index in nodes.size():
 		nodes[index].temperature = temperatures[index]
 		nodes[index].plastic_strain = strains[index]
@@ -138,6 +152,8 @@ func step(nodes: Array[Dictionary], links: Array[Dictionary], exposed_areas: Pac
 		nodes[index].erase("separated_impurities")
 	phase_events = events
 	boundary_energy_j = external_energy
+	mean_temperature_rate_c_s = mean_rates
+	peak_cooling_rate_c_s = peak_cooling
 	return true
 
 

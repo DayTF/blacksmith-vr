@@ -1035,3 +1035,13 @@ and a defensive copy of the terminal constituents, impurities and process
 state. `NamedBilletSnapshot` holds the terminal record without retaining a
 solver. Persistent storage, final stats, recipes and tracked naming remain
 in #17.
+
+## Continuous heat exchange and cooling rates (#81, #83)
+
+Heat exchange continues while holding the billet. Air, the cold anvil,
+water, oil and the forge each impose their applicable thermal conditions.
+The thermal solver exposes point-indexed `mean_temperature_rate_c_s`
+(signed) and `peak_cooling_rate_c_s` (nonnegative, over internal substeps)
+after each successful call. Failed calls clear both arrays. These
+measurements support tracking rapid changes for quench and hardening
+classification. The classification rule and tracked station wiring remain open.
