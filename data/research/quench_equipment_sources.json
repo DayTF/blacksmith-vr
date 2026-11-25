@@ -1,5 +1,20 @@
 {
   "status": "research_only",
+  "anvil": {
+    "source": "https://doi.org/10.1243/095440502760272449",
+    "source_location": "Sections 5.1 and 5.3 and Figure 6",
+    "condition": "Ground EN8 carbon steel billet resting under its own weight on a lubricated, preheated H13 die before upsetting",
+    "billet_diameter_m": 0.025,
+    "billet_height_m": 0.0375,
+    "furnace_temperature_c": 910,
+    "comparison_surface_temperature_c": 850,
+    "lubricant": "Undiluted DeltaForge F-31 brushed on the die",
+    "boundary": {
+      "temperature_c": 250,
+      "contact_conductance_w_m2k": 395
+    },
+    "notes": "Conductance inferred from die temperature measurements. The die was preheated to 250 C and its surface warmed during contact. The reference flux uses its nominal initial temperature at a common 850 C billet surface for comparison. The coupon furnace setpoint is not the contact surface temperature."
+  },
   "water": {
     "source": "https://www.jstage.jst.go.jp/article/isijinternational/54/6/54_1396/_html",
     "source_location": "Section 5.1 and Figure 3",
@@ -13,7 +28,22 @@
       "coefficient_curve": {"constant": 7200, "unit": "W/(m^2 K)"},
       "include_radiation": true
     },
-    "notes": "Inversely fitted convection coefficient. The paper's Abaqus boundary includes a separate radiation term. Use only with the documented bar geometry and agitated conditions for calibration."
+    "notes": "Inversely fitted convection coefficient. The paper's Abaqus boundary includes a separate radiation term. Use only with the documented bar geometry and agitated conditions for calibration. The inferred coefficient reflects the stirred experiment and does not characterize a stationary tank or resolve early film boiling.",
+    "steel_grades": [
+      "AISI 1045",
+      "AISI 4140",
+      "AISI 4340"
+    ],
+    "comparison_surface_temperature_c": 850,
+    "austenitization_duration_s": 3600,
+    "tank_diameter_m": 0.28,
+    "tank_depth_m": 0.29,
+    "agitation": {
+      "method": "Bar moved in a circle through the water",
+      "circle_radius_m": 0.12,
+      "rotations_per_minute_approx": 96,
+      "initial_relative_speed_m_s_approx": 1.2
+    }
   },
   "oil": {
     "source": "https://doi.org/10.2320/matertrans.H-M2020810",

@@ -1208,3 +1208,25 @@ Loose meshes are registered separately and the quench surface permits pickup
 through the liquid. A fresh pointing ray wins on the trigger frame. If finger
 curl removes the ray, the short latch rechecks its original target against
 current geometry. A remote pickup into solid forge geometry is rejected.
+
+## Anvil and water boundary comparison (#126)
+
+Run `godot --headless --path "$validation_dir" --script tests/compare_equipment_heat_flux.gd`
+after staging a validation project as described above. The fixture uses the
+same exposed area and an 850 °C surface for each boundary, disables radiation,
+and measures the first step's heat flux.
+
+- The preview anvil draws 249 kW/m². The study's resting EN8 billet on a lubricated
+  H13 die gives 237 kW/m² at the die's initial 250 °C and its fitted conductance
+  of 395 W/(m² K). The temperature difference explains the similar flux despite
+  the difference in conductance. The study measures a preheated die before an
+  upsetting operation. [Chang and Bramley](https://doi.org/10.1243/095440502760272449)
+- Preview water draws 345 kW/m² versus 5,947 kW/m² for the study's fitted
+  coefficient in agitated 24 °C water. The study uses round bars stirred in a
+  circular path, and its fit has limited resolution during early boiling.
+  [Ariza et al.](https://www.jstage.jst.go.jp/article/isijinternational/54/6/54_1396/_html)
+
+The comparison isolates heat flux at the interface. It does not reproduce the
+transient cooling of either steel specimen or calibrate a still bath. Runtime
+tuning continues to use the prototype material curves. Oil requires resolved
+face-specific reference data under #99.
