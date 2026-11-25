@@ -1,12 +1,14 @@
 extends Node3D
 ## Desktop inspection only. Player forging will use tracked XR motion (#15).
 
+const ForgeAudio := preload("res://src/game/forge_audio.gd")
 const Session = preload("res://src/game/preview_session.gd")
 const LayeredSession = preload("res://src/game/layered_preview_session.gd")
 const RoundedSurface = preload("res://src/game/rounded_billet_surface.gd")
 const FractureGeometry = preload("res://src/game/fracture_preview_geometry.gd")
 
 @export var layered_replay := false
+var _strike_audio: Node3D
 var session: RefCounted = Session.new()
 var _surface := MeshInstance3D.new()
 var _wire := MeshInstance3D.new()
@@ -57,6 +59,8 @@ func _ready() -> void:
 		session.reset(float(session.config.temperature_presets_c[0 if _quench_capture else 1]))
 		session.inspect_environment(2 if _quench_capture else 1)
 	_build_stage()
+	if not layered_replay:
+		_build_strike_audio()
 	_build_ui()
 	_cache_faces()
 	_refresh()
@@ -65,7 +69,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if session.billet == null:
 		return
+	var strikes_before: int = session.strikes
 	if session.advance(session.config.step_s if _smoke else delta):
+		if _strike_audio != null and session.strikes > strikes_before:
+			_strike_audio.play_strike(session.billet, session.contact)
 		_refresh()
 	if not session.errors.is_empty():
 		_fail()
@@ -73,6 +80,11 @@ func _process(delta: float) -> void:
 	elif (session.finished or (_thermal_capture and session.elapsed >= session.environments.capture_duration_s) or (_before_strike and session.elapsed >= session.config.strike_interval_s - session.config.step_s * 2)) and not _completed and (_smoke or not _capture_path.is_empty()):
 		_completed = true
 		_finish_capture()
+
+
+func _build_strike_audio() -> void:
+	_strike_audio = ForgeAudio.new()
+	add_child(_strike_audio)
 
 
 func _build_stage() -> void:

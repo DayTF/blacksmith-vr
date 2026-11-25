@@ -27,6 +27,8 @@ func run() -> PackedStringArray:
 		var hit: Dictionary = billet.hits[0]
 		if not hit.center.is_equal_approx(Vector3(0, 0.02, 0)) or not hit.velocity.is_equal_approx(Vector3(0, -3.5, 0)):
 			failures.append("Hammer uses swept contact and tracked tip displacement per second.")
+		if not sweep.last_contact.is_equal_approx(hit.center):
+			failures.append("Impact feedback uses the most recent accepted swept contact.")
 	sweep.reset_tracking()
 	_sample(sweep, billet, Vector3(0, 0, 0))
 	_sample(sweep, billet, Vector3(0.3, 0.05, 0))

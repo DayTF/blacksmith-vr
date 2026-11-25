@@ -1,0 +1,10 @@
+{
+  "description": "Provisional presentation gain and positional attenuation tuning.",
+  "hearth_db": -13.0,
+  "hiss_db": -12.0,
+  "ping_db": -7.0,
+  "thunk_db": -5.0,
+  "station_unit_size_m": 0.6,
+  "strike_unit_size_m": 0.35,
+  "impulse_full_gain_ns": 0.1
+}
