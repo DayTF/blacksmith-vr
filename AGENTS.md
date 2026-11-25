@@ -1052,3 +1052,11 @@ multiple contacts in one step (#85). Each contact has a data-defined
 allocates each exposed patch only once. The solver sums boundary heat
 flows and conductances before applying the same adaptive timestep and
 pairwise conduction. The existing single-boundary `step` wraps this API.
+
+With boundary detail enabled, `BilletSurface.evaluate` includes unburied
+dual-face `patches` with node, center, outward normal and area (#87).
+`forge_thermal_contacts.gd` assigns these areas to room stations using
+a room-local transform. Bath and forge volumes are coarse at patch
+resolution. Anvil contact uses the flat working face. The desktop forge
+and bath previews use this allocation. Tracked immersion still requires
+station-local support because the current grip clamps to the anvil plane.

@@ -80,6 +80,7 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary], include_bounda
 				faces[key] = []
 			faces[key].append({"owner": index, "nodes": face, "face_index": face_index})
 	var boundary: Array[Dictionary] = []
+	var patches: Array[Dictionary] = []
 	var areas := PackedFloat64Array()
 	areas.resize(nodes.size())
 	for entries: Array in faces.values():
@@ -123,6 +124,9 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary], include_bounda
 					touching[ids[corner]].append(other)
 			if not buried:
 				areas[ids[corner]] += area / 4.0
+				if include_boundary:
+					patches.append({"node": ids[corner], "center": point - normal * probe,
+						"normal": normal, "area": area / 4.0})
 		if include_boundary:
 			var backing := {}
 			var face_index: int = entries[0].face_index
@@ -138,6 +142,7 @@ func evaluate(nodes: Array[Dictionary], cells: Array[Dictionary], include_bounda
 	var result := {"areas": areas, "exposed": exposed, "unresolved_cells": unresolved}
 	if include_boundary:
 		result["boundary"] = boundary
+		result["patches"] = patches
 	return result
 
 
