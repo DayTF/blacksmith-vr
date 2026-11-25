@@ -4,8 +4,10 @@
 
 Build a single-room VR blacksmithing simulator. The player forges through tracked
 arm movements: heat, hammer, spread, fold, forge-weld, quench, name the product,
-then keep a static item with permanent craftsmanship stats. No button-driven
-hammering, locomotion, MMO, other professions, or multi-room expansion.
+then keep a static item with permanent craftsmanship stats. Physical walking
+and aimed teleport are allowed within the single room (#65). No continuous
+stick-driven locomotion, button-driven hammering, MMO, other professions, or
+multi-room expansion.
 
 The user's **Blacksmith VR — Technical Design Document**, sections 1–13, is the
 original specification. This guide preserves its implementation constraints and
@@ -22,8 +24,12 @@ permission. Keep this guide current when decisions or public sim APIs change.
   below, **Forward+ and Vulkan**. CI currently pins
   Godot 4.7.2 Standard. The starter project's Windows D3D12 setting was corrected
   to Vulkan with user approval.
-- OpenXR with SteamVR runtime. Track the controller/hammer tip at knuckle-level
-  grip; use OpenXR hand tracking when available and controller models otherwise.
+- OpenXR with SteamVR runtime. Track hammer tip motion from the knuckle-level
+  grip while the player holds a world tool. The hammer uses the same pickup
+  and release interaction as other tools (#68). Use both hands' full articulated
+  finger data when available, including Steam Frame native controller fingers
+  and OpenXR optical hand tracking. Retain an appropriate controller fallback
+  when the runtime has no full joint data (#67).
 - Blender → GLB assets, with PBR materials authored/imported in the engine.
 - JSON for materials, defaults, process/equipment properties, recipes,
   progression, tuning and final-stat formulas.
@@ -162,8 +168,8 @@ surfaces via SDFGI/equivalent; depth/fresnel/rippling water and rougher absorbin
 oil; splash particles and tank-local steam/fog; forge particles/light/fog;
 plastic-strain sparks; PBR tools. Impurity visuals are optional. Positional
 elastic ping/plastic thunk crossfade depends on strain ratio. Expose hammer mass,
-face radius, damping, audio and emission tuning. No locomotion; comfort options
-and XR performance must be tested on hardware before claiming readiness.
+face radius, damping, audio and emission tuning. Test physical walking, aimed
+teleport comfort, and XR performance on hardware before claiming readiness.
 
 ## Issue, branch and PR workflow
 
@@ -936,3 +942,21 @@ Regenerate it with `blender --background --python assets/forge_room/build_room.p
 The room study uses static coal and liquid references. Equipment behavior,
 XR room integration, localized effects and audio stay in #16. M2 remains
 open pending the M1 hardware interaction and timing checks.
+
+
+## Interactive room movement and tool decisions (#65–#68)
+
+The interactive room keeps its front start, rear forge, central anvil and
+side quench tank. Players reach them by physical room-scale walking or by
+aiming at an eligible floor destination and confirming teleport. The Steam VR
+demo is a behavior reference. The new rule supersedes the original
+locomotion ban for these two forms of movement. Implementation is #66.
+
+Full two-hand finger tracking is #67. Use valid native-controller hand joints
+through OpenXR on Steam Frame when exposed by the runtime. Optical hand
+tracking and controller fallback remain supported. The hammer begins as a
+world tool and must be picked up and released through the shared tool
+interaction (#68). A held hammer still requires tracked arm motion to forge.
+The attached right-hand hammer and fixed stage in the older XR preview are
+development fixtures; the acceptance criteria for the interactive game
+are recorded under the new issues.
