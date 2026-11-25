@@ -12,7 +12,6 @@ const HammerTracking = preload("res://src/vr/hammer_tracking.gd")
 var _room: Node3D
 var _thermal_contacts: RefCounted
 var _boundaries := {}
-var _peak_cooling := PackedFloat64Array()
 var _tracking: XROrigin3D
 var _sweep := TrackedHammer.new()
 var _grab := BilletGrab.new()
@@ -289,15 +288,11 @@ func _step_thermal(delta: float) -> bool:
 	for station: String in areas:
 		var boundary: String = _room.quench_medium() if station == "bath" else station
 		contacts.append({"areas": areas[station], "boundary": _boundaries[boundary]})
-	if not session.thermal.step_with_boundaries(session.billet.nodes, session.billet.connections, contacts, delta):
-		session.errors.append_array(session.thermal.errors)
+	if not session.step_thermal(contacts, delta):
 		return false
-	session.phase_count += session.thermal.phase_events.size()
-	_peak_cooling.resize(session.billet.nodes.size())
 	var wet_area := 0.0
 	var cooling := 0.0
-	for index in _peak_cooling.size():
-		_peak_cooling[index] = maxf(_peak_cooling[index], session.thermal.peak_cooling_rate_c_s[index])
+	for index in session.peak_cooling_rate_c_s.size():
 		var area: float = areas.bath[index]
 		wet_area += area
 		cooling += area * maxf(0.0, -session.thermal.mean_temperature_rate_c_s[index])
@@ -332,7 +327,7 @@ func _run_bath_smoke(capture_path := "") -> void:
 	for point: Dictionary in session.billet.nodes:
 		lowest = minf(lowest, point.position.y)
 	if absf(lowest - floor) > 0.001 or not held_temperature < session.temperature \
-			or not session.summary().temperature_mean < held_temperature or _peak_cooling[0] <= 0.0:
+			or not session.summary().temperature_mean < held_temperature or session.peak_cooling_rate_c_s[0] <= 0.0:
 		_setup_failed("Released billet failed to settle and cool at the bath floor.")
 		return
 	print("Tracked bath ready: ", _room.quench_medium(), " · ", lowest, " m")

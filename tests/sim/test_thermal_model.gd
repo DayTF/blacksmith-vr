@@ -108,6 +108,9 @@ func _test_phase_recovery_and_atomicity() -> void:
 	var nodes: Array[Dictionary] = [_node(49)]
 	_expect(model.step(nodes, _no_links, PackedFloat64Array([1]), 0.02, _boundary("quench_water", 100)), "Heat through phase threshold")
 	_expect(model.phase_events.size() == 1 and model.phase_events[0].active and model.phase_events[0].node == 0, "Local phase entry emitted")
+	if model.phase_events.size() == 1:
+		_near(model.phase_events[0].step_offset_s, 1.0 / 510.0, 1e-12, "Threshold entry time is interpolated")
+		_near(model.phase_events[0].temperature_rate_c_s, 510.0, 1e-9, "Entry records the local heating rate")
 	_near(nodes[0].plastic_strain, 0.5 * exp(-0.04), 1e-12, "Curve-defined recovery rate")
 	_near(nodes[0].impurity_mass.inclusion, 0.01, 1e-12, "Heat cannot remove impurities")
 	_expect(model.step(nodes, _no_links, PackedFloat64Array([1]), 0.02, _boundary("quench_water", 0)), "Cool through phase threshold")

@@ -1083,3 +1083,13 @@ by the rim footprint. This does not model side-wall collisions, fluid drag
 or independent supports for detached fragments. The staged XR scene accepts
 `--tracked-bath-smoke` for deterministic headless verification. Headset
 validation remains open.
+
+## Thermal crossing history (#92)
+
+Thermal phase events include the crossing offset within the committed step
+and the signed local temperature rate of the crossing substep. Crossing
+time is interpolated within that substep. `PreviewSession.step_thermal`
+records these events against its cumulative thermal time and retains peak
+local cooling rates. Naming copies the history into the static item record.
+The timing can support material-specific cooling windows and hardening
+rules. The history itself does not alter material hardness.
