@@ -1134,3 +1134,12 @@ to inspect its flow stress in pascals. Inputs are Celsius, true strain and
 strain rate in reciprocal seconds. The evaluator refuses extrapolation.
 Its tests cross-check the published fitted curves. The fit stays in the
 research data and is distinct from the annealed NIST dataset.
+
+Run `godot --headless --script tests/measure_tracked_compression.gd`
+to compare the tracked resistance fixture against the reported 1045 fit
+domain (#106). The diagnostic uses the vertical envelope near the
+hammer and the flat anvil as a height reference. It reports interval
+averages over committed steps for the synthetic Mithril fixture. These
+values are not local plastic strain, substep peaks or headset measurements.
+The 0.5 and 1.5 m/s replays peaked at 0.0093 and 0.0386 true strain.
+Neither replay had a compressive interval inside all published fit bounds.

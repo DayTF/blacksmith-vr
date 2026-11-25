@@ -76,6 +76,9 @@ jobs:
             exit 1
           fi
 
+      - name: Measure tracked fixture compression
+        run: godot --headless --path . --script tests/measure_tracked_compression.gd
+
       - name: Run the headless M0 forging replay
         shell: bash
         run: |
