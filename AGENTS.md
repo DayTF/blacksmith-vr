@@ -1168,3 +1168,17 @@ when the source's coefficient already includes relevant radiative loss.
 Each boundary selects one of a curve, a material property or solid contact
 conductance. Research setup metadata for the published water and oil
 experiments is in `data/research/quench_equipment_sources.json`.
+
+## Pointing pickup (#114)
+
+Extend the index finger with the middle finger curled to show a red pickup
+ray. Pull that hand's trigger to bring the targeted loose tool to its grip.
+Keep the trigger held or take over with the ordinary grip. Both hands can
+hold separate tools. The ray starts at the tracked index tip when joints
+are available; controller aim is the fallback. Optical tracking uses pinch
+for pickup. The existing left-hand billet grip takes priority when close
+enough to grab the billet.
+
+Remote targeting currently covers the registered anvil tools. The expanded
+prop inventory, blocking geometry, billet pickup and teleport changes are
+tracked in #115–#118. Steam Frame control feel and bindings remain open.

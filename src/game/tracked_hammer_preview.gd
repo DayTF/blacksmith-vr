@@ -1,5 +1,6 @@
 extends "res://src/game/billet_preview.gd"
 
+const IndexRay := preload("res://src/vr/index_pickup_ray.gd")
 const WorldTools = preload("res://src/vr/world_tool_grip.gd")
 const Teleport = preload("res://src/vr/forge_teleport.gd")
 const ThermalContacts := preload("res://src/game/forge_thermal_contacts.gd")
@@ -21,6 +22,10 @@ var _xr: XRInterface
 var _settings: Dictionary
 var _face_offset: Vector3
 var _tools := WorldTools.new()
+var _left_tools := WorldTools.new()
+var _pickup_beams: Array[MeshInstance3D] = []
+var _point_targets := PackedInt32Array([-1, -1])
+var _point_age := PackedFloat64Array([INF, INF])
 var _aiming := false
 var _teleport_target: Variant
 var _landing := MeshInstance3D.new()
@@ -72,7 +77,7 @@ func _ready() -> void:
 	_status.position = Vector2(28, 24)
 	canvas.add_child(_status)
 	_refresh(false)
-	_update_tools(0.0, {})
+	_update_tools(0.0, {}, {})
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--tracked-bath-capture="):
 			_run_bath_smoke(argument.trim_prefix("--tracked-bath-capture="))
@@ -130,10 +135,29 @@ func _build_tools() -> void:
 		tongs.add_child(arm)
 	_tools.tools = [
 		{"name": "Hammer", "kind": "hammer", "pose": Transform3D(Basis.IDENTITY, Vector3(0.14, 0.045, 0.11)), "mesh": _hammer,
-			"offset": _face_offset + Vector3.UP * 0.01, "fall": 0.0, "clearance": 0.04},
+			"offset": _face_offset + Vector3.UP * 0.01, "aim_offset": _face_offset,
+			"fall": 0.0, "clearance": 0.04},
 		{"name": "Tongs", "kind": "tongs", "pose": Transform3D(Basis.IDENTITY, Vector3(-0.15, 0.014, 0.11)), "mesh": tongs,
-			"offset": Vector3.ZERO, "fall": 0.0, "clearance": 0.008},
+			"offset": Vector3.ZERO, "aim_offset": Vector3.FORWARD * 0.045,
+			"aim_radius": 0.115, "fall": 0.0, "clearance": 0.008},
 	]
+
+	_left_tools.tools = _tools.tools
+	var shape := CylinderMesh.new()
+	shape.height = 1.0
+	shape.top_radius = 0.002
+	shape.bottom_radius = 0.002
+	var finish_beam := StandardMaterial3D.new()
+	finish_beam.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	finish_beam.albedo_color = Color(1.0, 0.22, 0.12)
+	shape.material = finish_beam
+	for hand in 2:
+		var beam := MeshInstance3D.new()
+		beam.mesh = shape
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		beam.hide()
+		add_child(beam)
+		_pickup_beams.append(beam)
 
 
 func _build_landing_marker() -> void:
@@ -150,15 +174,13 @@ func _build_landing_marker() -> void:
 	add_child(_landing)
 
 
-func _update_tools(delta: float, sample: Dictionary) -> void:
-	if not sample.is_empty():
-		sample.pose = global_transform.affine_inverse() * sample.pose
-	if _tools.update(sample, _settings.grab_reach_m, _settings.grab_press, _settings.grab_release):
-		_sweep.reset_tracking()
+func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
+	_update_tool_hand(0, _tools, _left_tools.held, right, delta)
+	_update_tool_hand(1, _left_tools, _tools.held, left, delta)
 	for index in _tools.tools.size():
 		var tool := _tools.tools[index]
 		var pose: Transform3D = tool.pose
-		if index == _tools.held:
+		if index == _tools.held or index == _left_tools.held:
 			tool.fall = 0.0
 		else:
 			var above_anvil := absf(pose.origin.x) < 0.24 and absf(pose.origin.z) < 0.155
@@ -170,6 +192,43 @@ func _update_tools(delta: float, sample: Dictionary) -> void:
 			tool.pose = pose
 		tool.mesh.transform = pose.translated_local(tool.offset)
 
+
+func _update_tool_hand(hand: int, grip: RefCounted, unavailable: int, sample: Dictionary, delta: float) -> void:
+	var beam := _pickup_beams[hand]
+	beam.hide()
+	_point_age[hand] += delta
+	if sample.is_empty():
+		_point_targets[hand] = -1
+	else:
+		var stage_from_world := global_transform.affine_inverse()
+		sample.pose = stage_from_world * sample.pose
+		var aim: Dictionary = _tracking.pickup_ray(hand == 1)
+		sample.trigger = aim.get("trigger", sample.pressure if sample.source == "hand" else 0.0)
+		var committing: bool = sample.trigger >= _settings.grab_press and _point_age[hand] <= 0.12 and _point_targets[hand] >= 0
+		if grip.held < 0 and aim.has("ray") and not committing:
+			var ray: Transform3D = stage_from_world * aim.ray
+			var hit := IndexRay.nearest(ray, _tools.tools, 5.0, unavailable)
+			_point_targets[hand] = hit.target
+			_point_age[hand] = 0.0
+			var direction := -ray.basis.z.normalized()
+			var distance: float = maxf(0.002, hit.distance)
+			beam.transform = Transform3D(Basis(Quaternion(Vector3.UP, direction)).scaled_local(
+				Vector3(1.0, distance, 1.0)), ray.origin + direction * distance * 0.5)
+			beam.show()
+		if _point_age[hand] <= 0.12:
+			sample.remote_target = _point_targets[hand]
+	if grip.update(sample, _settings.grab_reach_m, _settings.grab_press, _settings.grab_release, unavailable):
+		_sweep.reset_tracking()
+		_point_targets[hand] = -1
+		if grip.held >= 0:
+			beam.hide()
+
+
+func _held_hammer() -> int:
+	for index in [_tools.held, _left_tools.held]:
+		if index >= 0 and _tools.tools[index].kind == "hammer":
+			return index
+	return -1
 
 func _update_teleport() -> void:
 	var sample: Dictionary = _tracking.aim()
@@ -222,10 +281,12 @@ func _process(delta: float) -> void:
 	_update_teleport()
 	_update_grab()
 	var tool_hand: Dictionary = _tracking.tool_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
-	_update_tools(delta, tool_hand)
+	var left: Dictionary = {} if _grab.held else _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
+	_update_tools(delta, tool_hand, left)
 	var strike_landed := false
-	if _tools.held >= 0 and _tools.tools[_tools.held].kind == "hammer" and not _grab.held:
-		var pose: Transform3D = _tools.tools[_tools.held].pose
+	var hammer := _held_hammer()
+	if hammer >= 0 and not _grab.held:
+		var pose: Transform3D = _tools.tools[hammer].pose
 		var tip := pose * _face_offset
 		if _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
 				session.config.hammer_mass_kg, _settings.maximum_sample_gap_s, _settings.maximum_sample_travel_m):
@@ -248,7 +309,7 @@ func _process(delta: float) -> void:
 		_strike_audio.play_strike(session.billet, _sweep.last_contact)
 	var severed := _refresh(false)
 	_status.text = "%s\n%d hits · %d severed links · %.2f ms sim · %d host FPS\n%s" % [
-		_tools.tools[_tools.held].name + " held" if _tools.held >= 0 else "Right grip near a tool to pick it up",
+		"Point and trigger, or grip a nearby tool" if _tools.held < 0 and _left_tools.held < 0 else "Tool held",
 		session.strikes, severed, session.step_ms, Engine.get_frames_per_second(),
 		"Billet held · release left grip to place" if _grab.held else "Left grip near billet to pick up"]
 	_frame_report += delta
@@ -353,6 +414,9 @@ func _run_bath_smoke(capture_path := "") -> void:
 
 
 func _update_grab() -> void:
+	if _left_tools.held >= 0:
+		_grab_armed = false
+		return
 	var sample: Dictionary = _tracking.off_hand(_settings.pinch_closed_m, _settings.pinch_open_m)
 	var source: String = sample.get("source", "")
 	if source != _grab_source:
