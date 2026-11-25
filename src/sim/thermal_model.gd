@@ -2,6 +2,8 @@ extends RefCounted
 ## Conservative pairwise heat exchange and bounded explicit boundary exchange.
 ## All candidate state is private until a complete step succeeds.
 
+const TransferCurve := preload("res://src/sim/material_curve.gd")
+
 var materials: RefCounted
 var tuning: Dictionary
 var errors := PackedStringArray()
@@ -39,11 +41,23 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 		if areas.size() != nodes.size() or not _number(boundary.get("temperature_c")):
 			return _fail("Invalid thermal boundary or exposure array.")
 		var fixed: Variant = boundary.get("contact_conductance_w_m2k")
+		var source_count := int(fixed != null) + int(boundary.has("coefficient_curve")) + int(boundary.has("coefficient_property"))
+		if source_count != 1:
+			return _fail("A thermal boundary requires one transfer coefficient source.")
+		var scale: Variant = boundary.get("coefficient_scale", 1.0)
+		var radiation: Variant = boundary.get("include_radiation", fixed == null)
+		var curve: TransferCurve
+		if not radiation is bool or not _number(scale) or scale < 0.0:
+			return _fail("Invalid thermal boundary scale or radiation setting.")
 		if fixed != null:
-			if not _number(fixed) or fixed < 0.0:
+			if not _number(fixed) or fixed < 0.0 or scale != 1.0:
 				return _fail("Invalid solid contact conductance.")
-		elif not boundary.get("coefficient_property") is String or not _number(boundary.get("coefficient_scale")) or boundary.coefficient_scale < 0:
-			return _fail("Invalid boundary transfer coefficient.")
+		elif boundary.has("coefficient_curve"):
+			curve = TransferCurve.new(boundary.coefficient_curve)
+			if not curve.errors.is_empty() or curve.vector_value:
+				return _fail("Boundary coefficient must be a valid scalar curve.")
+		elif not boundary.coefficient_property is String or not boundary.has("coefficient_scale"):
+			return _fail("Invalid material boundary transfer coefficient.")
 		for area in areas:
 			if not _number(area) or area < 0.0:
 				return _fail("Invalid thermal exposure area.")
@@ -55,7 +69,8 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 		if ambient < -float(tuning.kelvin_offset):
 			return _fail("Thermal boundary is below absolute zero.")
 		boundaries.append({"areas": areas, "temperature": ambient,
-			"property": boundary.get("coefficient_property", ""), "scale": boundary.get("coefficient_scale", 1.0), "fixed": fixed})
+			"property": boundary.get("coefficient_property", ""), "scale": scale,
+			"fixed": fixed, "curve": curve, "radiation": radiation})
 	var temperatures := PackedFloat64Array()
 	var strains := PackedFloat64Array()
 	for index in nodes.size():
@@ -110,6 +125,13 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 				var transfer: float
 				if boundary.fixed != null:
 					transfer = float(boundary.fixed)
+				elif boundary.curve != null:
+					var equipment_context := {"temperature": temperatures[index],
+						"boundary_temperature": boundary.temperature}
+					var coefficient: Variant = boundary.curve.sample(equipment_context)
+					if not _number(coefficient) or coefficient < 0.0:
+						return _fail("Invalid equipment heat-transfer curve response.")
+					transfer = float(coefficient) * float(boundary.scale)
 				else:
 					var property: String = boundary.property
 					if not properties.has(property):
@@ -117,10 +139,11 @@ func step_with_boundaries(nodes: Array[Dictionary], links: Array[Dictionary],
 						if not _number(coefficient) or coefficient < 0.0:
 							return _fail("Invalid thermal curve: " + property)
 						properties[property] = float(coefficient)
+					transfer = properties[property] * boundary.scale
+				if boundary.radiation:
 					var ak: float = boundary.temperature + tuning.kelvin_offset
 					# Factor the fourth-power difference into a frozen conductance.
-					var radiation: float = properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
-					transfer = properties[property] * boundary.scale + radiation
+					transfer += properties.emissivity * tuning.stefan_boltzmann_w_m2k4 * (tk + ak) * (tk * tk + ak * ak)
 				var g: float = boundary.areas[index] * transfer
 				if not is_finite(g):
 					return _fail("Nonfinite thermal boundary conductance.")

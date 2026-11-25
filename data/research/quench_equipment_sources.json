@@ -1,0 +1,28 @@
+{
+  "status": "research_only",
+  "water": {
+    "source": "https://www.jstage.jst.go.jp/article/isijinternational/54/6/54_1396/_html",
+    "source_location": "Section 5.1 and Figure 3",
+    "condition": "Agitated water, cylindrical steel bars",
+    "bath_temperature_c": 24,
+    "initial_bar_temperature_c": 850,
+    "bar_diameter_m": 0.0254,
+    "bar_length_m": 0.1,
+    "boundary": {
+      "temperature_c": 24,
+      "coefficient_curve": {"constant": 7200, "unit": "W/(m^2 K)"},
+      "include_radiation": true
+    },
+    "notes": "Inversely fitted convection coefficient. The paper's Abaqus boundary includes a separate radiation term. Use only with the documented bar geometry and agitated conditions for calibration."
+  },
+  "oil": {
+    "source": "https://doi.org/10.2320/matertrans.H-M2020810",
+    "source_location": "Sections 2.1 and 3.2, Figures 5 and 8",
+    "condition": "SUS304 disk edge insulated by a jig, Daphne Bright Quench oil",
+    "bath_temperature_c": 60,
+    "initial_disk_temperature_c": 850,
+    "disk_diameter_m": 0.035,
+    "disk_thickness_m": 0.01,
+    "notes": "Inferred effective transfer coefficients differ between the upper and lower faces. Keep the two curves distinct. The text identifies Figure 8(a) as temperature-dependent while its printed x-axis label says time. Confirm the axis and digitization before using it as an input curve."
+  }
+}

@@ -1151,3 +1151,11 @@ with two starting temperatures in Celsius. The fixture checks heat-flow
 direction, thermal equilibrium and internal energy drift with insulation.
 Conductivity uses the RRR 100 reference column and heat capacity uses
 elemental solid copper. It is a thermal reference outside the playable catalog.
+
+Thermal boundaries can supply a scalar `coefficient_curve` for equipment
+research (#110). Its context contains local `temperature` and
+`boundary_temperature` in Celsius. Set `include_radiation: false`
+when the source's coefficient already includes relevant radiative loss.
+Each boundary selects one of a curve, a material property or solid contact
+conductance. Research setup metadata for the published water and oil
+experiments is in `data/research/quench_equipment_sources.json`.
