@@ -62,7 +62,7 @@ func reset(prescribed_temperature: float) -> bool:
 
 
 func advance(delta: float) -> bool:
-	if paused or finished or not errors.is_empty():
+	if solidified or paused or finished or not errors.is_empty():
 		return false
 	elapsed += minf(delta, config.step_s)
 	var progress := clampf((elapsed - float(_layout.start_hold_s)) / float(_layout.fold_duration_s), 0.0, 1.0)

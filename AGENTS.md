@@ -1024,3 +1024,14 @@ The fixture reads the existing thermal boundaries. Headless smoke starts
 a charge near the forge cap and verifies warming without an overshoot.
 Tracked equipment contact and the in-room choice of bath medium remain
 part of #16.
+
+## Named billet desktop fixture (#79)
+
+Run the billet or layered study with `-- --preview-naming`. Enter a name
+and use **Name and keep** to freeze the current billet and view its static
+mesh. The preview collection keeps entries until you leave the study.
+Replay builds a fresh billet while named entries retain their own geometry
+and a defensive copy of the terminal constituents, impurities and process
+state. `NamedBilletSnapshot` holds the terminal record without retaining a
+solver. Persistent storage, final stats, recipes and tracked naming remain
+in #17.
