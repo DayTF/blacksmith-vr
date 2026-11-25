@@ -25,6 +25,7 @@ func _ready() -> void:
 		_fail()
 		set_process(false)
 		return
+	session.billet.tuning.hammer_impulse_transfer = _settings.hammer_impulse_transfer
 	session.billet.tuning.anvil_friction_coefficient = _settings.anvil_friction_coefficient
 	session.billet.tuning.maximum_density_multiplier = _settings.maximum_density_multiplier
 	_stage_floor_y = -_settings.anvil_height_m

@@ -862,3 +862,15 @@ opens severed faces and draws isolated points as small fragments. It can switch
 diagonals to preserve supported triangles. Fracture retains the original mass.
 The preview still uses the original cell topology. It does not reconstruct a
 closed fracture surface or simulate fragment-to-fragment collisions.
+
+## Tracked hammer resistance (#54)
+
+The tracked fixture sets the existing impulse transfer multiplier to 0.20.
+The contact solver still uses the measured tip velocity, face radius and
+hammer mass. Material curves and other fixtures retain their existing tuning.
+Six alternating off-center synthetic sweeps at 1.5 m/s in the 1000 °C,
+30-point reference fixture retained 14.47 mm of the initial 15 mm working
+height with zero severed links. At full transfer they retained 10.87 mm
+with 13 severed links. Sweeps at 0.5 m/s still produced permanent strain.
+These are reproducible synthetic inputs. Steam Frame resistance needs a
+hardware retest.
