@@ -135,6 +135,8 @@ jobs:
           godot --headless --path . res://scenes/forge_room_study.tscn --quit-after 4 -- --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
           godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
           godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 60 -- --room-quench-smoke --room-oil 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          godot --headless --path . res://scenes/forge_room_study.tscn --fixed-fps 60 --quit-after 120 -- --room-heat-smoke 2>&1 | tee -a "$RUNNER_TEMP/forge-room.log"
+          grep -q 'Room heat ready:' "$RUNNER_TEMP/forge-room.log"
           grep -q 'Room quench ready: water' "$RUNNER_TEMP/forge-room.log"
           grep -q 'Room quench ready: oil' "$RUNNER_TEMP/forge-room.log"
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/forge-room.log"; then
