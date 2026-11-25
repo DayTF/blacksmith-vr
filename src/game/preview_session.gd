@@ -5,6 +5,7 @@ const Library = preload("res://src/sim/material_library.gd")
 const Billet = preload("res://src/sim/granular_billet.gd")
 const Grid = preload("res://src/sim/billet_grid.gd")
 const Thermal = preload("res://src/sim/thermal_model.gd")
+const NamedSnapshot := preload("res://src/sim/named_billet_snapshot.gd")
 const Purification = preload("res://src/sim/forging_purification.gd")
 var materials := Library.new()
 var billet_backend: Script = Billet
@@ -13,6 +14,9 @@ var config: Dictionary
 var errors := PackedStringArray()
 var paused := false
 var finished := false
+var solidified: bool:
+	get: return _solidified
+var _solidified := false
 var elapsed := 0.0
 var strikes := 0
 var step_ms := 0.0
@@ -67,6 +71,7 @@ func reset(prescribed_temperature: float) -> bool:
 			initial_impurity_mass += amount
 	paused = false
 	finished = false
+	_solidified = false
 	elapsed = 0.0
 	strikes = 0
 	_next_strike_at = config.strike_interval_s
@@ -78,7 +83,7 @@ func reset(prescribed_temperature: float) -> bool:
 
 
 func advance(delta: float) -> bool:
-	if paused or finished or not errors.is_empty():
+	if solidified or paused or finished or not errors.is_empty():
 		return false
 	# One step at most per render; a slow machine slows the demo rather than
 	# accumulating an unbounded catch-up queue or changing the physical timestep.
@@ -124,6 +129,8 @@ func advance(delta: float) -> bool:
 
 
 func resume_forging() -> void:
+	if solidified:
+		return
 	# Continue the same matter/history after reheating or a completed sequence.
 	thermal_inspection = false
 	paused = false
@@ -133,10 +140,23 @@ func resume_forging() -> void:
 
 
 func inspect_environment(index: int) -> void:
+	if solidified:
+		return
 	thermal_inspection = true
 	boundary = environments.environments[index]
 	paused = false
 	finished = false
+
+
+func solidify(item_name: String) -> RefCounted:
+	var name := item_name.strip_edges()
+	if solidified or billet == null or name.is_empty() or not errors.is_empty():
+		return null
+	var item := NamedSnapshot.new(name, billet, {
+		"strikes": strikes, "elapsed_s": elapsed, "phase_events": phase_count,
+	})
+	_solidified = true
+	return item
 
 
 func summary() -> Dictionary:

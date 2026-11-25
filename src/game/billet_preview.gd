@@ -35,13 +35,19 @@ var _thermal_capture := false
 var _quench_capture := false
 var _verify_purification := false
 var _completed := false
+var _live_fragments: MultiMesh
+var _collection_picker: OptionButton
+var _collection: Array[Dictionary] = []
+var _viewing_collection := false
+var _naming_smoke := false
 
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--preview-capture="):
 			_capture_path = argument.trim_prefix("--preview-capture=")
-		_smoke = _smoke or argument == "--preview-smoke"
+		_naming_smoke = _naming_smoke or argument == "--preview-naming-smoke"
+		_smoke = _smoke or argument == "--preview-smoke" or _naming_smoke
 		_before_strike = _before_strike or argument == "--preview-before-strike"
 		_thermal_capture = _thermal_capture or argument == "--preview-heat" or argument == "--preview-quench"
 		_quench_capture = _quench_capture or argument == "--preview-quench"
@@ -67,13 +73,16 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if session.billet == null:
+	if session.billet == null or _viewing_collection:
 		return
 	var strikes_before: int = session.strikes
 	if session.advance(session.config.step_s if _smoke else delta):
 		if _strike_audio != null and session.strikes > strikes_before:
 			_strike_audio.play_strike(session.billet, session.contact)
 		_refresh()
+		if _naming_smoke and session.strikes > 0:
+			_finish_naming_smoke()
+			return
 	if not session.errors.is_empty():
 		_fail()
 		set_process(false)
@@ -165,7 +174,8 @@ func _build_visuals() -> void:
 	fragment_instances.mesh = fragment_mesh
 	fragment_instances.instance_count = session.billet.nodes.size()
 	fragment_instances.visible_instance_count = 0
-	_fragments.multimesh = fragment_instances
+	_live_fragments = fragment_instances
+	_fragments.multimesh = _live_fragments
 	add_child(_fragments)
 	add_child(_camera)
 	_camera.near = 0.005
@@ -335,7 +345,8 @@ func _build_ui() -> void:
 	_pause.pressed.connect(func():
 		session.paused = not session.paused
 		_pause.text = "Resume" if session.paused else "Pause"
-		_refresh())
+		if not _viewing_collection:
+			_refresh())
 	column.add_child(_pause)
 	var switch_preview := Button.new()
 	switch_preview.text = "Back to billet study" if layered_replay else "Open layered weld replay"
@@ -343,6 +354,8 @@ func _build_ui() -> void:
 		var destination := "billet_preview" if layered_replay else "layered_preview"
 		get_tree().change_scene_to_file("res://scenes/%s.tscn" % destination))
 	column.add_child(switch_preview)
+	if "--preview-naming" in OS.get_cmdline_user_args() or _naming_smoke:
+		_build_collection_controls(column)
 	if layered_replay:
 		var controls := Label.new()
 		controls.text = "Right-drag to orbit · Wheel to zoom"
@@ -361,7 +374,8 @@ func _build_ui() -> void:
 		else:
 			session.inspect_environment(index - 1)
 		_pause.text = "Pause"
-		_refresh())
+		if not _viewing_collection:
+			_refresh())
 	column.add_child(_environments)
 	var sites := CheckButton.new()
 	sites.text = "Show impurity release sites"
@@ -375,6 +389,104 @@ func _build_ui() -> void:
 	column.add_child(note)
 
 
+func _build_collection_controls(column: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	column.add_child(row)
+	var name_field := LineEdit.new()
+	name_field.placeholder_text = "Billet name"
+	name_field.custom_minimum_size.x = 160.0
+	row.add_child(name_field)
+	var keep := Button.new()
+	keep.text = "Name and keep"
+	keep.pressed.connect(func(): _keep_current(name_field.text))
+	name_field.text_submitted.connect(_keep_current)
+	row.add_child(keep)
+	_collection_picker = OptionButton.new()
+	_collection_picker.add_item("Current billet")
+	_collection_picker.tooltip_text = "Clears when you leave this study"
+	_collection_picker.item_selected.connect(_display_collection)
+	column.add_child(_collection_picker)
+
+
+func _keep_current(item_name: String) -> void:
+	if _viewing_collection or (_surface.mesh == null and _fragments.multimesh.visible_instance_count == 0):
+		return
+	var item: RefCounted = session.solidify(item_name)
+	if item == null:
+		return
+	_collection.append({
+		"item": item,
+		"mesh": _surface.mesh,
+		"fragments": _capture_fragments(),
+	})
+	_collection_picker.add_item(item.assigned_name())
+	_collection_picker.select(_collection.size())
+	_display_collection(_collection.size())
+
+
+func _capture_fragments() -> MultiMesh:
+	var snapshot := MultiMesh.new()
+	snapshot.transform_format = MultiMesh.TRANSFORM_3D
+	snapshot.use_colors = true
+	snapshot.mesh = _live_fragments.mesh
+	snapshot.instance_count = _live_fragments.visible_instance_count
+	for index in snapshot.instance_count:
+		snapshot.set_instance_transform(index, _live_fragments.get_instance_transform(index))
+		snapshot.set_instance_color(index, _live_fragments.get_instance_color(index))
+	return snapshot
+
+
+func _display_collection(index: int) -> void:
+	_viewing_collection = index > 0
+	_hammer.visible = not _viewing_collection
+	if not _viewing_collection:
+		_fragments.multimesh = _live_fragments
+		_refresh()
+		return
+	var saved: Dictionary = _collection[index - 1]
+	_surface.mesh = saved.mesh
+	_fragments.multimesh = saved.fragments
+	_wire.mesh = null
+	_purification_sites.multimesh.visible_instance_count = 0
+	var item: RefCounted = saved.item
+	_status.text = "%s · static collection item" % item.assigned_name()
+
+
+func _finish_naming_smoke() -> void:
+	_keep_current("Inspection billet")
+	if _collection.size() != 1:
+		push_error("Naming did not store the billet.")
+		get_tree().quit(1)
+		return
+	var saved: Dictionary = _collection[0]
+	var item: RefCounted = saved.item
+	var before: Dictionary = item.terminal_state()
+	var edited_copy: Dictionary = item.terminal_state()
+	edited_copy.nodes[0].temperature = -99.0
+	var frozen_step: int = session.billet.step_id
+	session.resume_forging()
+	session.inspect_environment(1)
+	if session.advance(session.config.step_s) or session.billet.step_id != frozen_step:
+		push_error("The named billet continued stepping.")
+		get_tree().quit(1)
+		return
+	_restart(float(session.config.temperature_presets_c[1]))
+	_collection_picker.select(1)
+	_display_collection(1)
+	if not _viewing_collection or saved.mesh != _surface.mesh or before != item.terminal_state():
+		push_error("A new billet or view replaced the static collection item.")
+		get_tree().quit(1)
+		return
+	print("Named billet ready: ", item.assigned_name())
+	if not _capture_path.is_empty():
+		await RenderingServer.frame_post_draw
+		var result := get_viewport().get_texture().get_image().save_png(_capture_path)
+		await get_tree().create_timer(0.55).timeout
+		get_tree().quit(result)
+	else:
+		get_tree().quit()
+
+
 func _restart(temperature: float) -> void:
 	if not session.reset(temperature):
 		_fail()
@@ -382,7 +494,11 @@ func _restart(temperature: float) -> void:
 	_pause.text = "Pause"
 	if _environments != null:
 		_environments.select(0)
-	_refresh()
+	if _collection_picker != null:
+		_collection_picker.select(0)
+		_display_collection(0)
+	else:
+		_refresh()
 
 
 func _unhandled_input(event: InputEvent) -> void:
