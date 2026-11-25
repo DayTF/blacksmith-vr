@@ -1,0 +1,61 @@
+{
+  "material": "AISI 1045 carbon steel",
+  "status": "research_only",
+  "dataset": {
+    "title": "A Dynamic Plasticity Model for Rapidly-Heated 1045 Steel up to 1000 °C",
+    "publisher": "National Institute of Standards and Technology",
+    "url": "https://doi.org/10.18434/mds2-2393",
+    "paper": "https://doi.org/10.6028/jres.126.026",
+    "rights": "https://www.nist.gov/open/license",
+    "condition": "Annealed ferrite–pearlite before testing",
+    "method": "Compression using a Kolsky bar and a servohydraulic test machine",
+    "coverage_note": "Counts are CSV experiment blocks. Some experiments appear in more than one table. The high-temperature tests are concentrated at high strain rates after rapid heating."
+  },
+  "files": [
+    {
+      "name": "MIDAS_steel_data_and_fits_below_400C.csv",
+      "url": "https://data.nist.gov/od/ds/mds2-2393/MIDAS_steel_data_and_fits_below_400C.csv",
+      "sha256": "c779ccb61e307b647e002ea94735c602b07a510e29c971dcbd449c65b0e1156f",
+      "experiment_blocks": 15,
+      "initial_temperature_c": [23.0, 378.5866072],
+      "nominal_strain_rate_per_s": [0.001, 16541.2625886]
+    },
+    {
+      "name": "MIDAS_steel_data_and_fits_to_A1.csv",
+      "url": "https://data.nist.gov/od/ds/mds2-2393/MIDAS_steel_data_and_fits_to_A1.csv",
+      "sha256": "15aa7324d08ea5c2cb74d6d873fe87df006a7843feea5a2b9f2446bab946f05c",
+      "experiment_blocks": 18,
+      "initial_temperature_c": [23.0, 656.06157],
+      "nominal_strain_rate_per_s": [2297.48717391, 4391.17396947]
+    },
+    {
+      "name": "MIDAS_steel_data_and_fits_above_A1.csv",
+      "url": "https://data.nist.gov/od/ds/mds2-2393/MIDAS_steel_data_and_fits_above_A1.csv",
+      "sha256": "e5127687bfc95de5a8ae4117d086862460a73c89dae96c7509989b3c45283b49",
+      "experiment_blocks": 9,
+      "initial_temperature_c": [711.0, 1007.286794],
+      "nominal_strain_rate_per_s": [4078.23082192, 4718.20790419]
+    }
+  ],
+  "related_evidence": [
+    {
+      "url": "https://www.techscience.com/CMES/v142n3/59762/html",
+      "condition": "Rolled and normalized bar before hot compression",
+      "temperature_c": [900, 1280],
+      "strain_rate_per_s": [0.1, 100],
+      "data_access": "Published fit coefficients and plots. The article says raw data are available from the authors on request.",
+      "use": "Compare lower-rate hot flow under the study heating protocol. Keep this condition distinct from the NIST rapid-heating dataset."
+    },
+    {
+      "url": "https://www.osti.gov/servlets/purl/898032",
+      "condition": "AISI 1045 weld heat-affected zone",
+      "data_access": "Published measurements and analysis",
+      "use": "Cross-check observed phase changes under the experimental welding thermal histories."
+    }
+  ],
+  "calibration_gaps": [
+    "Reconcile initial condition and deformation-rate coverage for the selected forging grade.",
+    "Fit hot mechanical response without treating finite-strain compression flow stress as zero-strain yield strength.",
+    "Source thermal properties, ductility and heat-treatment behavior for the selected condition before catalog activation."
+  ]
+}

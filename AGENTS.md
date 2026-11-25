@@ -1121,3 +1121,9 @@ desktop and tracked previews also accept `-- --preview-material=<catalog-id>`.
 The scripted layered study retains its authored material pair. Unknown IDs
 fail setup and the existing default remains Mithril. Incomplete real-grade
 research lives outside the playable material catalog.
+
+The AISI 1045 source audit (#102) lives in
+`data/research/aisi_1045_sources.json` outside the runtime catalog.
+Run `python3 tools/fetch_material_sources.py data/research/aisi_1045_sources.json --output <directory>`
+to retrieve and verify the original measurement files. Preserve material
+condition, test ranges and data limitations when deriving curves.
