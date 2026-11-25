@@ -13,10 +13,12 @@ The user's **Blacksmith VR — Technical Design Document**, sections 1–13, is 
 original specification. This guide preserves its implementation constraints and
 the subsequent decisions below. GitHub issues contain acceptance criteria and
 references to those sections. Later explicit user decisions supersede the
-original text. Do not silently resolve conflicting or unspecified gameplay or
-physical rules: create a `question` issue, describe options, and ask the user.
-Routine implementation details already authorized below do not need renewed
-permission. Keep this guide current when decisions or public sim APIs change.
+original text. Use realistic forging practice and physics as the default for
+unspecified behavior. Implement straightforward physical consequences without
+asking for confirmation, and document approximations that materially affect the
+simulator. Create a `question` issue and ask only when requirements conflict or
+a consequential gameplay or physical choice remains unresolved after applying
+this default. Keep this guide current when decisions or public sim APIs change.
 
 ## Stack and layout
 
@@ -75,6 +77,11 @@ permission. Keep this guide current when decisions or public sim APIs change.
   heal it. This supersedes the unreviewed tensile-only prototype behavior.
 - Thermal transport includes conduction, Newton cooling, radiation and
   medium-dependent quenching. Heating obeys equipment limits.
+  Heat exchange continues while a billet is held or resting during live forging.
+  Exposed regions exchange heat with air, the forge, the cold anvil, water or oil
+  according to their contact and temperature. Track rapid local cooling for
+  quench and hardening determination. A billet released in the bath falls under
+  gravity, settles on the tank floor and continues cooling while submerged (#89).
 
 ### Curves and composition
 
@@ -922,8 +929,8 @@ left grip crosses its press threshold. Optical hand tracking supplies a
 thumb/index pinch when available. Release and tracking-source changes
 drop the piece and invalidate the hammer sweep history. A new grip must
 first open after tracking reconnects. The carried lattice uses a rigid
-transform, preserves material state, and stays above the existing anvil
-plane. The preview pauses mechanical and process stepping while held.
+transform and preserves its shape. Room support limits placement and
+thermal exchange continues while held (#90).
 Release resumes gravity with zero carried velocity. Detached debris is
 outside the selected connected component.
 
@@ -1058,5 +1065,21 @@ dual-face `patches` with node, center, outward normal and area (#87).
 `forge_thermal_contacts.gd` assigns these areas to room stations using
 a room-local transform. Bath and forge volumes are coarse at patch
 resolution. Anvil contact uses the flat working face. The desktop forge
-and bath previews use this allocation. Tracked immersion still requires
-station-local support because the current grip clamps to the anvil plane.
+and bath previews use this allocation.
+
+## Tracked thermal contact and bath release (#90)
+
+During tracked forging, thermal integration runs on physics ticks even while
+held. Room patches select air, forge, bath or the cold anvil. The bath uses
+the existing water default or the `--room-oil` preview option. The anvil uses
+a fixed-temperature contact boundary with a provisional conductance in
+`data/preview/environments.json`. Local peak cooling rates accumulate for
+the live billet, and quench feedback follows cooling of wet patches.
+
+Release restores gravity. A billet released in the bath falls to the tank
+floor and continues cooling. The mechanics preview uses the highest support
+under the billet footprint as its single plane. Tank walls are approximated
+by the rim footprint. This does not model side-wall collisions, fluid drag
+or independent supports for detached fragments. The staged XR scene accepts
+`--tracked-bath-smoke` for deterministic headless verification. Headset
+validation remains open.

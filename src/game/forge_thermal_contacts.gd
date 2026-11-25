@@ -4,6 +4,8 @@ extends RefCounted
 const Surface := preload("res://src/sim/billet_surface.gd")
 const FIRE := AABB(Vector3(-0.88, 0.885, -2.78), Vector3(0.80, 0.55, 0.67))
 const BATH := AABB(Vector3(1.0725, 0.70, -1.7145), Vector3(0.635, 0.178, 0.749))
+const TANK_OUTSIDE := Rect2(1.013, -1.77, 0.754, 0.86)
+const TANK_RIM_HEIGHT_M := 0.9825
 const ANVIL_FACE := Rect2(-0.24, -0.335, 0.48, 0.31)
 const ANVIL_HEIGHT_M := 0.90
 const CONTACT_TOLERANCE_M := 0.001
@@ -44,7 +46,7 @@ func areas_by_station(billet: RefCounted, room_from_billet: Transform3D) -> Dict
 
 
 func _station_for_patch(center: Vector3, normal: Vector3) -> String:
-	if BATH.has_point(center):
+	if BATH.grow(0.00001).has_point(center):
 		return "bath"
 	if FIRE.has_point(center):
 		return "forge"
@@ -52,3 +54,16 @@ func _station_for_patch(center: Vector3, normal: Vector3) -> String:
 			and ANVIL_FACE.has_point(Vector2(center.x, center.z)):
 		return "anvil"
 	return "air"
+
+
+static func support_height(room_position: Vector3) -> float:
+	var footprint := Vector2(room_position.x, room_position.z)
+	if Rect2(BATH.position.x, BATH.position.z, BATH.size.x, BATH.size.z).has_point(footprint):
+		return BATH.position.y
+	if TANK_OUTSIDE.has_point(footprint):
+		return TANK_RIM_HEIGHT_M
+	if ANVIL_FACE.has_point(footprint):
+		return ANVIL_HEIGHT_M
+	if Rect2(-1.30, -2.92, 1.64, 0.94).has_point(footprint):
+		return FIRE.position.y
+	return 0.0

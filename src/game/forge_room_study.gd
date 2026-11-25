@@ -59,11 +59,15 @@ func _focus_station(camera_position: Vector3, target: Vector3) -> void:
 func _start_thermal_preview(boundary_id: String, smoke: bool, charge_center: Vector3) -> void:
 	var fixture := ThermalPreview.new()
 	add_child(fixture)
-	fixture.cooling_changed.connect(_update_quench)
+	fixture.cooling_changed.connect(set_quench_intensity)
 	fixture.start(boundary_id, smoke, charge_center)
 
 
-func _update_quench(intensity: float) -> void:
+func quench_medium() -> String:
+	return _quench_medium
+
+
+func set_quench_intensity(intensity: float) -> void:
 	_effects.set_quench_intensity(intensity)
 	_station_audio.set_quench_intensity(intensity)
 	if not _quench_smoke or intensity <= 0.0:
