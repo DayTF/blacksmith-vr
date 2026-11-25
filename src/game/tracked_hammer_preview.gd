@@ -1,6 +1,7 @@
 extends "res://src/game/billet_preview.gd"
 
 const IndexRay := preload("res://src/vr/index_pickup_ray.gd")
+const PropInventory := preload("res://src/game/forge_prop_inventory.gd")
 const WorldTools = preload("res://src/vr/world_tool_grip.gd")
 const Teleport = preload("res://src/vr/forge_teleport.gd")
 const ThermalContacts := preload("res://src/game/forge_thermal_contacts.gd")
@@ -86,7 +87,7 @@ func _ready() -> void:
 		if "--tracked-bath-smoke" in OS.get_cmdline_user_args():
 			_run_bath_smoke()
 		elif "--tracked-preview-smoke" in OS.get_cmdline_user_args():
-			if session.strikes != 0 or _tools.held >= 0 or _tools.tools.size() != 2 or not session.billet.step(session.config.step_s):
+			if session.strikes != 0 or _tools.held >= 0 or not _prop_inventory_ready() or not session.billet.step(session.config.step_s):
 				_setup_failed("Tracked fixture failed its initial mechanics step.")
 				return
 			print("Tracked preview ready: ", session.billet.nodes.size(), " points, ",
@@ -135,13 +136,14 @@ func _build_tools() -> void:
 		tongs.add_child(arm)
 	_tools.tools = [
 		{"name": "Hammer", "kind": "hammer", "pose": Transform3D(Basis.IDENTITY, Vector3(0.14, 0.045, 0.11)), "mesh": _hammer,
-			"offset": _face_offset + Vector3.UP * 0.01, "aim_offset": _face_offset,
+			"offset": _face_offset + Vector3.UP * 0.01, "aim_offset": _face_offset, "impact_offset": _face_offset,
 			"fall": 0.0, "clearance": 0.04},
 		{"name": "Tongs", "kind": "tongs", "pose": Transform3D(Basis.IDENTITY, Vector3(-0.15, 0.014, 0.11)), "mesh": tongs,
 			"offset": Vector3.ZERO, "aim_offset": Vector3.FORWARD * 0.045,
 			"aim_radius": 0.115, "fall": 0.0, "clearance": 0.008},
 	]
 
+	_tools.tools.append_array(PropInventory.register(_room, self))
 	_left_tools.tools = _tools.tools
 	var shape := CylinderMesh.new()
 	shape.height = 1.0
@@ -158,6 +160,14 @@ func _build_tools() -> void:
 		beam.hide()
 		add_child(beam)
 		_pickup_beams.append(beam)
+
+
+func _prop_inventory_ready() -> bool:
+	var counts := {}
+	for tool in _tools.tools:
+		counts[tool.kind] = int(counts.get(tool.kind, 0)) + 1
+	return counts.get("hammer") == 5 and counts.get("tongs") == 1 \
+		and counts.get("stock") == 5 and counts.get("hot_stock") == 2 and counts.get("fuel") == 12
 
 
 func _build_landing_marker() -> void:
@@ -182,9 +192,13 @@ func _update_tools(delta: float, right: Dictionary, left: Dictionary) -> void:
 		var pose: Transform3D = tool.pose
 		if index == _tools.held or index == _left_tools.held:
 			tool.fall = 0.0
-		else:
-			var above_anvil := absf(pose.origin.x) < 0.24 and absf(pose.origin.z) < 0.155
-			var support: float = tool.clearance + (0.0 if above_anvil else Teleport.FLOOR)
+			tool.anchored = false
+		elif not tool.get("anchored", false):
+			var clearance: float = tool.clearance
+			if tool.has("aim_bounds"):
+				var rotated: AABB = Transform3D(pose.basis, Vector3.ZERO) * tool.aim_bounds
+				clearance = -rotated.position.y
+			var support := _support_height(pose.origin) + clearance
 			tool.fall += delta * 9.81
 			pose.origin.y = maxf(support, pose.origin.y - tool.fall * delta)
 			if pose.origin.y <= support:
@@ -287,7 +301,7 @@ func _process(delta: float) -> void:
 	var hammer := _held_hammer()
 	if hammer >= 0 and not _grab.held:
 		var pose: Transform3D = _tools.tools[hammer].pose
-		var tip := pose * _face_offset
+		var tip := pose * Vector3(_tools.tools[hammer].impact_offset)
 		if _sweep.apply(session.billet, tip, delta, session.config.hammer_radius_m,
 				session.config.hammer_mass_kg, _settings.maximum_sample_gap_s, _settings.maximum_sample_travel_m):
 			session.strikes += 1

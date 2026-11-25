@@ -19,6 +19,16 @@ static func nearest(ray: Transform3D, tools: Array[Dictionary], reach: float, un
 			continue
 		var tool := tools[index]
 		var pose: Transform3D = tool.pose
+		if tool.has("aim_bounds"):
+			var inverse := pose.affine_inverse()
+			var box: AABB = tool.aim_bounds
+			var local_origin := inverse * ray.origin
+			var hit: Variant = local_origin if box.has_point(local_origin) else box.intersects_ray(local_origin, inverse.basis * direction)
+			if hit is Vector3:
+				var distance: float = (pose * hit).distance_to(ray.origin)
+				if distance < float(result.distance):
+					result = {"target": index, "distance": distance}
+			continue
 		var center := pose * Vector3(tool.get("aim_offset", Vector3.ZERO))
 		var offset := center - ray.origin
 		var along := offset.dot(direction)

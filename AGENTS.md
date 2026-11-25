@@ -1182,3 +1182,11 @@ enough to grab the billet.
 Remote targeting currently covers the registered anvil tools. The expanded
 prop inventory, blocking geometry, billet pickup and teleport changes are
 tracked in #115–#118. Steam Frame control feel and bindings remain open.
+
+## Loose room props (#115)
+
+Both VR hands can pick up the four rack hammers, five bench blanks, twelve loose
+coals and two glowing hearth blanks, in addition to the hammer and tongs by the
+anvil. The room shell and fixtures stay fixed. Loose stock and fuel are props.
+The live granular billet uses its own grip and thermal controls. The tracked
+preview smoke check verifies that the authored props register on room load.
