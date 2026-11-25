@@ -48,11 +48,17 @@
   "oil": {
     "source": "https://doi.org/10.2320/matertrans.H-M2020810",
     "source_location": "Sections 2.1 and 3.2, Figures 5 and 8",
-    "condition": "SUS304 disk edge insulated by a jig, Daphne Bright Quench oil",
+    "condition": "Horizontal SUS304 disk with its rim insulated by a jig, immersed in Daphne Bright Quench oil",
     "bath_temperature_c": 60,
     "initial_disk_temperature_c": 850,
     "disk_diameter_m": 0.035,
     "disk_thickness_m": 0.01,
-    "notes": "Inferred effective transfer coefficients differ between the upper and lower faces. Keep the two curves distinct. The text identifies Figure 8(a) as temperature-dependent while its printed x-axis label says time. Confirm the axis and digitization before using it as an input curve."
+    "comparison_points": [
+      {"face": "top", "regime": "nucleate_boiling", "surface_temperature_c": 591, "coefficient_w_m2k": 2310},
+      {"face": "top", "regime": "transition_to_convection", "surface_temperature_c": 359, "coefficient_w_m2k": 582},
+      {"face": "bottom", "regime": "nucleate_boiling", "surface_temperature_c": 491, "coefficient_w_m2k": 1457},
+      {"face": "bottom", "regime": "transition_to_convection", "surface_temperature_c": 375, "coefficient_w_m2k": 346}
+    ],
+    "notes": "The pairs are approximate values stated in section 3.2, inferred from measured cooling curves. Figure 8(a) is described as temperature-dependent but has a time label. No values were digitized from the plot. The four points do not define a full curve."
   }
 }

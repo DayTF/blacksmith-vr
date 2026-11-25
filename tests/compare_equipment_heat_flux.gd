@@ -17,29 +17,41 @@ func _initialize() -> void:
 	var research := _read_json("res://data/research/quench_equipment_sources.json")
 	var settings := _read_json("res://data/preview/environments.json")
 	var tuning := _read_json("res://data/sim/thermal.json")
-	var water: Dictionary
+	var preview_baths := {}
 	for boundary: Dictionary in settings.environments:
-		if boundary.id == "water":
-			water = boundary
-			break
+		preview_baths[boundary.id] = boundary
 	var model := Thermal.new(materials, tuning)
 	for station in ["anvil", "water"]:
 		var reference: Dictionary = research[station].boundary
-		var preview: Dictionary = settings.anvil_contact if station == "anvil" else water
+		var preview: Dictionary = settings.anvil_contact if station == "anvil" else preview_baths.water
 		var coefficient: float = reference.get("contact_conductance_w_m2k",
 			reference.get("coefficient_curve", {}).get("constant", NAN))
 		var temperature: float = research[station].comparison_surface_temperature_c
-		var reference_flux := _heat_flux(model, reference, temperature)
-		var preview_flux := _heat_flux(model, preview, temperature)
-		var expected: float = coefficient * (temperature - reference.temperature_c)
-		if not is_finite(preview_flux) or preview_flux <= 0.0 or not is_equal_approx(reference_flux, expected):
-			_fail("Invalid %s comparison. %s" % [station, str(model.errors)])
+		if not _compare(model, station, reference, preview, temperature, coefficient):
 			return
-		print(JSON.stringify({"station": station, "surface_c": temperature,
-			"reference_boundary_c": reference.temperature_c, "preview_boundary_c": preview.temperature_c,
-			"reference_flux_w_m2": reference_flux, "preview_flux_w_m2": preview_flux,
-			"preview_to_reference_flux": preview_flux / reference_flux}))
+	for point: Dictionary in research.oil.comparison_points:
+		var coefficient: float = point.coefficient_w_m2k
+		var reference := {"temperature_c": research.oil.bath_temperature_c,
+			"coefficient_curve": {"constant": coefficient}}
+		var label: String = "oil_%s_%s" % [point.face, point.regime]
+		if not _compare(model, label, reference, preview_baths.oil, point.surface_temperature_c, coefficient):
+			return
 	quit()
+
+
+func _compare(model: Thermal, label: String, reference: Dictionary, preview: Dictionary,
+		temperature: float, coefficient: float) -> bool:
+	var reference_flux := _heat_flux(model, reference, temperature)
+	var preview_flux := _heat_flux(model, preview, temperature)
+	var expected: float = coefficient * (temperature - reference.temperature_c)
+	if not is_finite(preview_flux) or not is_finite(reference_flux) or preview_flux <= 0.0 			or reference_flux <= 0.0 or not is_equal_approx(reference_flux, expected):
+		_fail("Invalid %s comparison. %s" % [label, str(model.errors)])
+		return false
+	print(JSON.stringify({"station": label, "surface_c": temperature,
+		"reference_boundary_c": reference.temperature_c, "preview_boundary_c": preview.temperature_c,
+		"reference_flux_w_m2": reference_flux, "preview_flux_w_m2": preview_flux,
+		"preview_to_reference_flux": preview_flux / reference_flux}))
+	return true
 
 
 func _heat_flux(model: Thermal, boundary: Dictionary, temperature: float) -> float:
