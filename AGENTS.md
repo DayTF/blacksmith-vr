@@ -1038,16 +1038,16 @@ a charge near the forge cap and verifies warming without an overshoot.
 Tracked equipment contact and the in-room choice of bath medium remain
 part of #16.
 
-## Named billet desktop fixture (#79)
+## Named billet desktop fixture (#79, #136)
 
 Run the billet or layered study with `-- --preview-naming`. Enter a name
 and use **Name and keep** to freeze the current billet and view its static
-mesh. The preview collection keeps entries until you leave the study.
-Replay builds a fresh billet while named entries retain their own geometry
-and a defensive copy of the terminal constituents, impurities and process
-state. `NamedBilletSnapshot` holds the terminal record without retaining a
-solver. Persistent storage, final stats, recipes and tracked naming remain
-in #17.
+mesh. The desktop collection is shared by the two studies and reloads
+from `user://named_billets_v1`. Each entry contains the static mesh, fragment
+instances and the terminal record, including constituents, impurities and
+process history. Publishing the entry succeeds before the live billet freezes.
+The naming smoke check uses an isolated temporary directory and reloads the
+published entry. Final stats, recipes and tracked naming remain in #17.
 
 ## Continuous heat exchange and cooling rates (#81, #83)
 

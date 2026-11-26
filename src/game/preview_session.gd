@@ -180,7 +180,7 @@ func step_thermal(contacts: Array[Dictionary], dt: float) -> bool:
 	return true
 
 
-func solidify(item_name: String) -> RefCounted:
+func solidify(item_name: String, store: Callable = Callable()) -> RefCounted:
 	var name := item_name.strip_edges()
 	if solidified or billet == null or name.is_empty() or not errors.is_empty():
 		return null
@@ -190,6 +190,8 @@ func solidify(item_name: String) -> RefCounted:
 		"peak_cooling_rate_c_s": peak_cooling_rate_c_s,
 		"quench_hardening_by_point": _quench_hardening.outcomes(),
 	})
+	if store.is_valid() and not store.call(item):
+		return null
 	_solidified = true
 	return item
 

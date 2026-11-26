@@ -11,6 +11,9 @@ func run() -> PackedStringArray:
 		return session.errors
 	if session.solidify("   ") != null or session.solidified:
 		failures.append("An empty name leaves the billet active.")
+	var rejected := session.solidify("Save rejected", func(_item: RefCounted) -> bool: return false)
+	if rejected != null or session.solidified:
+		failures.append("A rejected save leaves the billet active and retryable.")
 	var item := session.solidify("  Layered study  ")
 	if item == null:
 		failures.append("A name freezes a layered billet.")
