@@ -51,6 +51,19 @@
       "condition": "AISI 1045 weld heat-affected zone",
       "data_access": "Published measurements and analysis",
       "use": "Cross-check observed phase changes under the experimental welding thermal histories."
+    },
+    {
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6720765/",
+      "condition": "AISI 1045 plate with heat treatment unspecified",
+      "temperature_c": [25, 150],
+      "data_access": "Table 1 reports conductivity and volumetric heat capacity with replicate standard deviations. Equations 7 and 8 fit those data.",
+      "use": "Check low-temperature thermal magnitudes. Volumetric heat capacity has units J/(m³ K) and requires a separate density to infer mass-specific heat."
+    },
+    {
+      "url": "https://bibliotheque.ec-lyon.fr/documents/TH_ENISE_iarrietagaldos.pdf",
+      "condition": "Ferrite–pearlite C45 variants with different thermomechanical histories",
+      "data_access": "Chapter 3, Figures 50, 54, 58 and 66. Density, heat capacity, diffusivity and compression plots.",
+      "use": "Compare microstructure sensitivity. The lower-rate compression program uses 20, 500 and 680 °C at 0.5, 5 and 50 s⁻¹. The author reports that machine compliance limits Young modulus inference. These data do not reach the hot-forging range."
     }
   ],
   "hot_compression_reference": {
@@ -69,8 +82,8 @@
       "m2": 0.11877,
       "m3": -0.10138,
       "m4": -0.00674,
-      "m5": -0.00008,
-      "m7": -0.15830,
+      "m5": -8e-05,
+      "m7": -0.1583,
       "m8": 0.00026,
       "m9": 2.48856
     }
@@ -79,5 +92,17 @@
     "Reconcile initial condition and deformation-rate coverage for the selected forging grade.",
     "Validate the published hot flow fit before adapting it to granular mechanics. Finite-strain compression flow stress does not establish zero-strain yield strength.",
     "Source thermal properties, ductility and heat-treatment behavior for the selected condition before catalog activation."
-  ]
+  ],
+  "held_out_compression_reference": {
+    "command": "python3 tools/benchmark_1045_holdout.py <download_directory>",
+    "source_file": "MIDAS_steel_data_and_fits_above_A1.csv",
+    "inputs": "Initial specimen temperature and measured true stress at shared strain values. Temperature-dependent fit uses the nearest retained run on each side. No published fitted stress column is used.",
+    "measured_strains": [0.05, 0.1, 0.2, 0.25],
+    "held_out_runs": 7,
+    "held_out_samples": 28,
+    "mean_absolute_error_mpa": 10.42,
+    "root_mean_square_error_mpa": 12.63,
+    "maximum_absolute_error_mpa": 26.35,
+    "scope": "One full intermediate-temperature run withheld at a time, with end runs retained to avoid extrapolation. Initial temperatures span 711–1007 °C and nominal rates span 4078–4718 s⁻¹ across the nine source runs. Rate and thermal history are coupled in this experimental series. The result does not establish a general rate-dependent constitutive law, an initial yield value or forging calibration."
+  }
 }
