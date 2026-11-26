@@ -22,7 +22,8 @@
       "source": "https://doi.org/10.1016/0022-3697(68)90023-1",
       "kind": "Three adiabatic calorimeters on high-purity copper",
       "temperature_c": [40, 900],
-      "note": "Range is from the abstract. Exact grade, anneal and measurement uncertainty need full-text verification."
+      "reported_reproducibility_percent": 0.7,
+      "note": "The abstract reports two polycrystals and one bicrystal. Exact grades, anneals and absolute measurement uncertainty need full-text verification."
     },
     "condition_cross_check": {
       "source": "https://escholarship.org/uc/item/6jd677cc",
@@ -35,12 +36,12 @@
   "deformation": [
     {
       "source": "https://doi.org/10.1016/S0749-6419(98)00061-8",
-      "condition": "Initially annealed OFHC copper",
+      "condition": "Machined OFHC stock vacuum annealed at 600 °C for four hours, then cooled rapidly. Initial mean grain diameter 62 µm.",
       "method": "Compression and free-end torsion with constant-rate and sequential tests",
       "unit": "True stress in MPa and dimensionless true strain",
-      "temperature_c": [25, 541],
+      "temperature_c": [25, 676],
       "strain_rate_magnitude_per_s": [0.0004, 6000],
-      "note": "Bounds span the experiment program and do not imply every temperature-rate combination was tested. Use Figures 12–14 for compression cross-checks at 25, 269 and 541 °C."
+      "note": "Bounds span the constant-rate compression series in §3.2 and do not imply every temperature-rate combination was tested. Figures 12–14 compare rates at 25, 269 and 541 °C. Furnace temperature control ±1 °C and torsion gage temperature control ±3 °C are reported in §2.5."
     },
     {
       "source": "https://doi.org/10.1016/j.matlet.2004.01.003",
