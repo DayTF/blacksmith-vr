@@ -1,0 +1,62 @@
+{
+  "material": "Annealed oxygen-free high-conductivity copper",
+  "status": "research_only",
+  "conductivity": {
+    "reference": "https://doi.org/10.6028/NBS.IR.84-3007",
+    "location": "Section 2.4, Table 2.4.1 and data-set summary [16], printed page 70",
+    "kind": "RRR-parametrized correlation across experimental specimens",
+    "unit": "W/(m K)",
+    "comparison": {
+      "source": "https://doi.org/10.1139/p67-309",
+      "condition": "Annealed 99.999+% copper rod, RRR 900",
+      "temperature_k": [300, 1200],
+      "reported_relative_uncertainty_percent_at_endpoints": [0.9, 1.5],
+      "note": "The two NIST reviews disagree on the annealing temperature for this rod. IR 84-3007 reports 700 K and Monograph 177 Table 7.8 reports 973 K. The example RRR 100 in the existing thermal coupon is a parameter choice without a matched stock specimen."
+    }
+  },
+  "heat_capacity": {
+    "reference": "https://webbook.nist.gov/cgi/inchi?ID=C7440508&Table=on&Type=JANAFS",
+    "kind": "Elemental copper reference correlation",
+    "unit": "J/(kg K) after molar mass conversion",
+    "comparison": {
+      "source": "https://doi.org/10.1016/0022-3697(68)90023-1",
+      "kind": "Three adiabatic calorimeters on high-purity copper",
+      "temperature_c": [40, 900],
+      "note": "Range is from the abstract. Exact grade, anneal and measurement uncertainty need full-text verification."
+    },
+    "condition_cross_check": {
+      "source": "https://escholarship.org/uc/item/6jd677cc",
+      "condition": "Cast OFHC ingot, cold rolled and then annealed at 400 °C for one hour, 15 µm mean grain diameter",
+      "measured_property": "Ultrasonic compressibility",
+      "temperature_k": [77, 800],
+      "note": "The paper uses literature heat capacities for copper and measures heat content for brass. It does not verify total heat capacity for this annealed OFHC specimen."
+    }
+  },
+  "deformation": [
+    {
+      "source": "https://doi.org/10.1016/S0749-6419(98)00061-8",
+      "condition": "Initially annealed OFHC copper",
+      "method": "Compression and free-end torsion with constant-rate and sequential tests",
+      "unit": "True stress in MPa and dimensionless true strain",
+      "temperature_c": [25, 541],
+      "strain_rate_magnitude_per_s": [0.0004, 6000],
+      "note": "Bounds span the experiment program and do not imply every temperature-rate combination was tested. Use Figures 12–14 for compression cross-checks at 25, 269 and 541 °C."
+    },
+    {
+      "source": "https://doi.org/10.1016/j.matlet.2004.01.003",
+      "condition": "Oxygen-free rod and a separate electrolytic grade, vacuum annealed at 750 °C for seven hours",
+      "method": "Isothermal hot compression",
+      "unit": "Flow stress in MPa and dimensionless true strain",
+      "temperature_c": [300, 950],
+      "strain_rate_magnitude_per_s": [0.001, 100],
+      "note": "Dynamic recrystallization changes flow stress with accumulated strain. Keep the oxygen-free specimen distinct from the electrolytic grade."
+    }
+  ],
+  "reuse": "NIST reuse guidance: https://www.nist.gov/open/license. This file records source citations and experimental metadata. Publisher reuse terms for full curves and raw measurements remain to be verified.",
+  "calibration_gaps": [
+    "No same-stock, high-temperature heat capacity and deformation datasets have been verified. Retain the elemental thermal coupon independently of the stock-specific material.",
+    "Retrieve specimen compositions, uncertainty and eligible compression curves before calibrating a flow model. Test dynamic recrystallization and history-dependent recovery independently.",
+    "Cooling is a thermal boundary problem. The steel transformation and hardening model has no evidentiary basis for this oxygen-free copper.",
+    "Retain this material outside the playable catalog pending coverage under issue 96."
+  ]
+}
