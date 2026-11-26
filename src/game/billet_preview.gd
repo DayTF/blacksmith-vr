@@ -5,6 +5,7 @@ const ForgeAudio := preload("res://src/game/forge_audio.gd")
 const Session = preload("res://src/game/preview_session.gd")
 const LayeredSession = preload("res://src/game/layered_preview_session.gd")
 const RoundedSurface = preload("res://src/game/rounded_billet_surface.gd")
+const Collection := preload("res://src/game/named_billet_collection.gd")
 const FractureGeometry = preload("res://src/game/fracture_preview_geometry.gd")
 
 @export var layered_replay := false
@@ -37,7 +38,9 @@ var _verify_purification := false
 var _completed := false
 var _live_fragments: MultiMesh
 var _collection_picker: OptionButton
-var _collection: Array[Dictionary] = []
+var _collection_store: Collection
+var _collection: Array[Collection.Entry] = []
+var _collection_status: Label
 var _viewing_collection := false
 var _naming_smoke := false
 
@@ -408,6 +411,11 @@ func _build_ui() -> void:
 
 
 func _build_collection_controls(column: VBoxContainer) -> void:
+	_collection_store = Collection.new()
+	if _naming_smoke:
+		var token := Crypto.new().generate_random_bytes(16).hex_encode()
+		_collection_store.directory = OS.get_temp_dir().path_join("blacksmith-naming-" + token)
+	_collection = _collection_store.load_entries()
 	var row := HBoxContainer.new()
 	column.add_child(row)
 	var name_field := LineEdit.new()
@@ -421,25 +429,45 @@ func _build_collection_controls(column: VBoxContainer) -> void:
 	row.add_child(keep)
 	_collection_picker = OptionButton.new()
 	_collection_picker.add_item("Current billet")
-	_collection_picker.tooltip_text = "Clears when you leave this study"
+	for item in _collection:
+		_collection_picker.add_item(item.assigned_name())
 	_collection_picker.item_selected.connect(_display_collection)
 	column.add_child(_collection_picker)
+	_collection_status = Label.new()
+	_collection_status.hide()
+	column.add_child(_collection_status)
+	if _collection_store.skipped_entries > 0:
+		_show_collection_status("%d saved entries could not be opened." % _collection_store.skipped_entries)
+
+
+func _show_collection_status(message: String) -> void:
+	_collection_status.text = message
+	_collection_status.visible = not message.is_empty()
 
 
 func _keep_current(item_name: String) -> void:
 	if _viewing_collection or (_surface.mesh == null and _fragments.multimesh.visible_instance_count == 0):
 		return
-	var item: RefCounted = session.solidify(item_name)
+	_show_collection_status("")
+	var item: RefCounted = session.solidify(item_name, _save_named_billet)
 	if item == null:
 		return
-	_collection.append({
-		"item": item,
-		"mesh": _surface.mesh,
-		"fragments": _capture_fragments(),
-	})
 	_collection_picker.add_item(item.assigned_name())
 	_collection_picker.select(_collection.size())
 	_display_collection(_collection.size())
+
+
+func _save_named_billet(item: RefCounted) -> bool:
+	var entry := Collection.Entry.new()
+	entry.terminal_bytes = var_to_bytes(item.terminal_state())
+	entry.mesh = _surface.mesh
+	entry.fragments = _capture_fragments()
+	var result := _collection_store.save(entry)
+	if result != OK:
+		_show_collection_status("Could not save billet. " + error_string(result))
+		return false
+	_collection.append(entry)
+	return true
 
 
 func _capture_fragments() -> MultiMesh:
@@ -461,13 +489,12 @@ func _display_collection(index: int) -> void:
 		_fragments.multimesh = _live_fragments
 		_refresh()
 		return
-	var saved: Dictionary = _collection[index - 1]
+	var saved := _collection[index - 1]
 	_surface.mesh = saved.mesh
 	_fragments.multimesh = saved.fragments
 	_wire.mesh = null
 	_purification_sites.multimesh.visible_instance_count = 0
-	var item: RefCounted = saved.item
-	_status.text = "%s · static collection item" % item.assigned_name()
+	_status.text = "%s · static collection item" % saved.assigned_name()
 
 
 func _finish_naming_smoke() -> void:
@@ -476,10 +503,9 @@ func _finish_naming_smoke() -> void:
 		push_error("Naming did not store the billet.")
 		get_tree().quit(1)
 		return
-	var saved: Dictionary = _collection[0]
-	var item: RefCounted = saved.item
-	var before: Dictionary = item.terminal_state()
-	var edited_copy: Dictionary = item.terminal_state()
+	var saved := _collection[0]
+	var before := saved.terminal_state()
+	var edited_copy := saved.terminal_state()
 	edited_copy.nodes[0].temperature = -99.0
 	var frozen_step: int = session.billet.step_id
 	session.resume_forging()
@@ -489,13 +515,26 @@ func _finish_naming_smoke() -> void:
 		get_tree().quit(1)
 		return
 	_restart(float(session.config.temperature_presets_c[1]))
-	_collection_picker.select(1)
-	_display_collection(1)
-	if not _viewing_collection or saved.mesh != _surface.mesh or before != item.terminal_state():
-		push_error("A new billet or view replaced the static collection item.")
+	_collection = _collection_store.load_entries()
+	var folder := DirAccess.open(_collection_store.directory)
+	for filename in folder.get_files():
+		folder.remove(filename)
+	DirAccess.remove_absolute(_collection_store.directory)
+	if _collection.size() != 1:
+		push_error("The saved billet could not be reloaded.")
 		get_tree().quit(1)
 		return
-	print("Named billet ready: ", item.assigned_name())
+	var restored := _collection[0]
+	_collection_picker.select(1)
+	_display_collection(1)
+	if not _viewing_collection or restored.mesh != _surface.mesh or before != restored.terminal_state() \
+			or saved.fragments.instance_count != restored.fragments.instance_count \
+			or saved.fragments.buffer != restored.fragments.buffer \
+			or not _same_static_mesh(saved.mesh, restored.mesh):
+		push_error("Reload changed the terminal state or static geometry.")
+		get_tree().quit(1)
+		return
+	print("Named billet ready: ", restored.assigned_name())
 	if not _capture_path.is_empty():
 		await RenderingServer.frame_post_draw
 		var result := get_viewport().get_texture().get_image().save_png(_capture_path)
@@ -504,6 +543,16 @@ func _finish_naming_smoke() -> void:
 	else:
 		get_tree().quit()
 
+
+func _same_static_mesh(before: Mesh, after: Mesh) -> bool:
+	if before == null or after == null:
+		return before == after
+	if before.get_surface_count() != after.get_surface_count():
+		return false
+	for index in before.get_surface_count():
+		if before.surface_get_arrays(index) != after.surface_get_arrays(index):
+			return false
+	return true
 
 func _restart(temperature: float) -> void:
 	if not session.reset(temperature):
