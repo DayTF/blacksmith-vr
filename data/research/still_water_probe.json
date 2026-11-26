@@ -1,0 +1,40 @@
+{
+  "status": "research_only",
+  "source": "https://doi.org/10.1299/jsmeb1988.33.2_340",
+  "condition": "S45C cylinder, mid-length core thermocouple, vertical immersion at 0.2 m/s in initially still, deaerated water. See sections 2 and 6.",
+  "diameter_m": 0.006,
+  "length_m": 0.08,
+  "initial_temperature_c": 850,
+  "initial_temperature_note": "Furnace setpoint used as a uniform initial condition at t=0. Transfer and progressive immersion are omitted.",
+  "thermal_inputs": {
+    "density_kg_m3": 7870,
+    "density_source": "https://doi.org/10.3390/pr10112171",
+    "density_location": "Table 1, adopted AISI 1045 workpiece value",
+    "polynomial_source": "https://doi.org/10.2355/isijinternational.54.1396",
+    "polynomial_location": "Table 2 austenite, coefficients in ascending powers of Celsius",
+    "conductivity_w_mk": [15, 0.008, 0.000009, -0.000000006],
+    "specific_heat_j_kgk": [532, 0.09, 0.00004, -0.00000004]
+  },
+  "digitization": "Approximate hand readings at log-time tick positions from Figure 16, with temperature bounds for line placement and overlap. Figure 17 rates are coarse independent plot readings from the same experiment. Figure 18 bounds cover plot reading and visible dispersion bars where present. Bounds are not statistical confidence intervals.",
+  "crossing_temperature_c": 727,
+  "cases": [
+    {
+      "bath_c": 20,
+      "figure_16_core_c_at_s": [[1, 510, 490, 530], [1.5, 290, 270, 310], [5, 60, 45, 75]],
+      "figure_17_rate_c_s": [300, 270, 330],
+      "figure_18_rate_c_s": [300, 285, 315]
+    },
+    {
+      "bath_c": 40,
+      "figure_16_core_c_at_s": [[1, 690, 670, 710], [2, 435, 415, 455], [5, 90, 75, 105]],
+      "figure_17_rate_c_s": [175, 155, 195],
+      "figure_18_rate_c_s": [175, 155, 200]
+    },
+    {
+      "bath_c": 45,
+      "figure_16_core_c_at_s": [[2, 670, 650, 690], [3, 640, 620, 660], [4, 590, 565, 615]],
+      "figure_17_rate_c_s": [105, 90, 120],
+      "figure_18_rate_c_s": [105, 75, 125]
+    }
+  ]
+}
