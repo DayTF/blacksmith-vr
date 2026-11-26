@@ -1209,24 +1209,30 @@ through the liquid. A fresh pointing ray wins on the trigger frame. If finger
 curl removes the ray, the short latch rechecks its original target against
 current geometry. A remote pickup into solid forge geometry is rejected.
 
-## Anvil and water boundary comparison (#126)
+## Published equipment boundary comparisons (#126, #128)
 
 Run `godot --headless --path "$validation_dir" --script tests/compare_equipment_heat_flux.gd`
 after staging a validation project as described above. The fixture uses the
-same exposed area and an 850 °C surface for each boundary, disables radiation,
-and measures the first step's heat flux.
+same exposed area, disables radiation, and reports the first step's heat flux.
+Each comparison uses the same surface temperature for its two boundaries.
 
-- The preview anvil draws 249 kW/m². The study's resting EN8 billet on a lubricated
+- At an 850 °C surface, the preview anvil draws 249 kW/m². The study's resting EN8 billet on a lubricated
   H13 die gives 237 kW/m² at the die's initial 250 °C and its fitted conductance
   of 395 W/(m² K). The temperature difference explains the similar flux despite
   the difference in conductance. The study measures a preheated die before an
   upsetting operation. [Chang and Bramley](https://doi.org/10.1243/095440502760272449)
-- Preview water draws 345 kW/m² versus 5,947 kW/m² for the study's fitted
+- At an 850 °C surface, preview water draws 345 kW/m² versus 5,947 kW/m² for the study's fitted
   coefficient in agitated 24 °C water. The study uses round bars stirred in a
   circular path, and its fit has limited resolution during early boiling.
   [Ariza et al.](https://www.jstage.jst.go.jp/article/isijinternational/54/6/54_1396/_html)
 
-The comparison isolates heat flux at the interface. It does not reproduce the
-transient cooling of either steel specimen or calibrate a still bath. Runtime
-tuning continues to use the prototype material curves. Oil requires resolved
-face-specific reference data under #99.
+- Preview oil gives about 5–39% of the inferred flux from the four reported
+  upper and lower face points in the 60 °C disk experiment. Use the published
+  temperature and coefficient pairs as individual points. Figure 8(a) prints
+  a time axis where the text describes temperature, so no curve was digitized.
+  [Kanamori and Ju](https://www.jstage.jst.go.jp/article/matertrans/61/5/61_H-M2020810/_pdf)
+
+This fixture compares local flux under different boundary conditions. Full
+transient cooling, a still-water comparison, and any runtime calibration
+remain follow-on work. The oil results come from a horizontal disk with an
+insulated rim, and its two faces exhibit different boiling behavior.
