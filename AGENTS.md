@@ -1236,3 +1236,22 @@ This fixture compares local flux under different boundary conditions. Full
 transient cooling, a still-water comparison, and any runtime calibration
 remain follow-on work. The oil results come from a horizontal disk with an
 insulated rim, and its two faces exhibit different boiling behavior.
+
+## Still-water steel probe benchmark (#130)
+
+Run `python3 tools/benchmark_still_water_probe.py` from a source checkout.
+The research fixture compares the preview's inherited water convection curve
+with the measured mid-length core transient of a 6 × 80 mm S45C cylinder.
+At the 727 °C crossing, the model gives approximately 43, 42 and 41 °C/s for
+20, 40 and 45 °C water, versus digitized rates of about 300, 175 and 105 °C/s.
+At one second in 20 °C water, the modeled core is about 814 °C versus
+510 °C from Figure 16. Individual plot-reading bounds, test conditions and
+steel property sources are in `data/research/still_water_probe.json`.
+
+The radial fixture checks timestep and mesh refinement. It assumes uniform
+850 °C at immersion, uses austenite conductivity and sensible heat capacity
+with a constant AISI 1045 density proxy, and omits end effects, radiation,
+phase-fraction changes and latent heat. The paper attributes a slowdown
+near 660 °C in hotter water to phase transformation. Its independent
+boiling heat-flux experiment uses a gold specimen. These comparisons inform
+equipment research. The preview still uses its existing tuning.
