@@ -10,6 +10,7 @@ const Room = preload("res://scenes/forge_room_study.tscn")
 const NativeBillet = preload("res://src/sim/native_granular_billet.gd")
 const BilletGrab = preload("res://src/sim/billet_grab.gd")
 const TrackedHammer = preload("res://src/sim/tracked_hammer.gd")
+const HammerMesh := preload("res://src/game/forging_hammer_mesh.gd")
 const HammerTracking = preload("res://src/vr/hammer_tracking.gd")
 
 var _room: Node3D
@@ -71,7 +72,8 @@ func _ready() -> void:
 		_boundaries[boundary.id] = boundary
 	_boundaries["anvil"] = session.environments.anvil_contact
 	_build_strike_audio()
-	_add_hammer_handle()
+	HammerMesh.build(_hammer, session.config.hammer_radius_m,
+		-_face_offset - Vector3.UP * HammerMesh.FACE_DROP_M)
 	_build_tools()
 	_build_landing_marker()
 	_cache_faces()
@@ -136,7 +138,7 @@ func _build_tools() -> void:
 		arm.position = Vector3(side * 0.018, 0, -0.045)
 		arm.rotation.y = side * 0.08
 		tongs.add_child(arm)
-	var hammer_offset := _face_offset + Vector3.UP * 0.01
+	var hammer_offset := _face_offset + Vector3.UP * HammerMesh.FACE_DROP_M
 	var hammer_bounds := _hammer.get_aabb()
 	for part in _hammer.get_children():
 		if part is MeshInstance3D:
@@ -149,7 +151,7 @@ func _build_tools() -> void:
 		{"name": "Hammer", "kind": "hammer", "pose": Transform3D(Basis.IDENTITY, Vector3(0.14, 0.045, 0.11)), "mesh": _hammer,
 			"offset": hammer_offset, "aim_offset": _face_offset, "impact_offset": _face_offset,
 			"collision_bounds": hammer_bounds,
-			"fall": 0.0, "clearance": 0.04},
+			"fall": 0.0, "clearance": -hammer_bounds.position.y},
 		{"name": "Tongs", "kind": "tongs", "pose": Transform3D(Basis.IDENTITY, Vector3(-0.15, 0.014, 0.11)), "mesh": tongs,
 			"offset": Vector3.ZERO, "aim_offset": Vector3.FORWARD * 0.045,
 			"aim_radius": 0.115, "fall": 0.0, "clearance": 0.008, "collision_bounds": tong_bounds},
@@ -355,23 +357,6 @@ func _setup_failed(message: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		get_tree().quit(1)
 	set_process(false)
-
-
-func _add_hammer_handle() -> void:
-	var handle := MeshInstance3D.new()
-	var shaft := CylinderMesh.new()
-	var grip := -_face_offset - Vector3.UP * 0.01
-	shaft.height = grip.length()
-	shaft.top_radius = 0.011
-	shaft.bottom_radius = 0.011
-	handle.mesh = shaft
-	handle.position = grip * 0.5
-	handle.quaternion = Quaternion(Vector3.UP, grip.normalized())
-	var grip_material := StandardMaterial3D.new()
-	grip_material.albedo_color = Color("4e3124")
-	grip_material.roughness = 0.85
-	handle.material_override = grip_material
-	_hammer.add_child(handle)
 
 
 func _process(delta: float) -> void:
